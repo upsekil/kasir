@@ -149,8 +149,6 @@
 
             <!-- CONTENT VIEWS -->
             <div class="flex-1 overflow-hidden relative p-3 md:p-6">
-                <!-- DASHBOARD, POS, PRODUCTS, HISTORY (SAMA SEPERTI SEBELUMNYA) -->
-                <!-- Saya ringkas bagian ini agar kode tidak terlalu panjang, logika tetap sama -->
                 
                 <!-- 1. DASHBOARD -->
                 <transition name="fade">
@@ -269,7 +267,7 @@
                     </div>
                 </transition>
                 
-                <!-- 5. PENGATURAN (Settings) - UPDATED WITH CHANGE PIN -->
+                <!-- 5. PENGATURAN (Settings) -->
                 <transition name="fade">
                     <div v-if="activeTab === 'settings'" class="h-full overflow-y-auto custom-scroll p-0 md:p-4 pb-20 md:pb-0">
                         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 max-w-7xl mx-auto items-start">
@@ -322,7 +320,7 @@
         </main>
     </div>
 
-    <!-- MODAL POPUPS (Checkout, Scanner, Produk) - Tetap sama, hanya hidden via v-if -->
+    <!-- MODAL POPUPS (Checkout, Scanner, Produk) -->
     <div v-if="modals.checkout" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm no-print">
         <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in"><div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50"><h3 class="font-bold text-lg">Pembayaran</h3><button @click="modals.checkout = false" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button></div><div class="p-6"><div class="text-center mb-6"><div class="text-sm text-slate-500 font-bold uppercase">Total Tagihan</div><div class="text-4xl font-extrabold text-indigo-600">{{ formatRupiah(total) }}</div></div><div class="mb-4"><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Uang Diterima (Cash)</label><input v-model.number="cashReceived" type="number" class="w-full p-4 text-xl font-bold text-right border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0"></div><div class="grid grid-cols-3 gap-2 mb-4"><button @click="cashReceived = total" class="py-2 bg-slate-100 rounded-lg text-xs font-bold hover:bg-slate-200 transition">Uang Pas</button><button @click="cashReceived = 50000" class="py-2 bg-slate-100 rounded-lg text-xs font-bold hover:bg-slate-200 transition">50.000</button><button @click="cashReceived = 100000" class="py-2 bg-slate-100 rounded-lg text-xs font-bold hover:bg-slate-200 transition">100.000</button></div><div :class="['p-4 rounded-xl border flex justify-between items-center', change >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200']"><span class="font-bold text-sm text-slate-700">Kembalian</span><span :class="['text-xl font-bold', change >= 0 ? 'text-green-700' : 'text-red-500']">{{ formatRupiah(change) }}</span></div></div><div class="p-5 bg-slate-50 border-t border-slate-100"><button @click="processTransaction" :disabled="cashReceived < total" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Proses & Cetak</button></div></div>
     </div>
@@ -403,10 +401,11 @@
             const cart = ref([]);
             const transactions = ref([]);
             
-            // --- SCANNER ---
+            // --- SCANNER VARIABLES ---
             let html5QrcodeScanner = null;
             const scannerTarget = ref('pos');
             const searchInput = ref(null);
+            let isProcessing = false; // Lock variable untuk mencegah double scan
 
             // --- AUTH FUNCTIONS ---
             const handleLogin = () => {
@@ -476,31 +475,80 @@
 
             const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num || 0);
             
-            // ... (Rest of scanner logic & chart logic similar to previous code) ...
-            // Simplified for brevity but functionality preserved
+            // --- SCANNER OPTIMIZATION ---
+            
+            // 1. Play Beep Sound
+            const playBeep = () => {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = "square"; 
+                    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(500, ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } catch(e) { console.warn("Audio context failed", e); }
+            };
 
             const openScanner = (target) => {
                 scannerTarget.value = target;
                 modals.scanner = true;
+                isProcessing = false; // Reset lock
+
                 nextTick(() => {
                     if (location.protocol !== "https:" && location.hostname !== "localhost") {
                         Swal.fire({icon:'error', title:'SSL Error', text:'Gunakan HTTPS untuk akses kamera.'});
                         return;
                     }
-                    const onScanSuccess = (d) => {
+
+                    // Callback
+                    const onScanSuccess = (decodedText) => {
+                        if (isProcessing) return; // Ignore if busy
+                        
+                        playBeep();
+
                         if (scannerTarget.value === 'pos') {
-                            const p = products.value.find(x => x.id === d);
-                            if(p) { addToCart(p); Swal.fire({icon:'success', title:p.name, toast:true, position:'top', timer:1000, showConfirmButton:false}); }
-                            else Swal.fire({icon:'error', title:'Produk 404', text:d, toast:true, position:'top', timer:1500});
+                            isProcessing = true; // Lock
+                            const p = products.value.find(x => x.id === decodedText);
+                            if(p) { 
+                                addToCart(p); 
+                                Swal.fire({
+                                    icon:'success', title:p.name, text: 'Masuk Keranjang', 
+                                    toast:true, position:'top', timer:1500, showConfirmButton:false
+                                }); 
+                            } else {
+                                Swal.fire({icon:'error', title:'Tidak Ditemukan', text:decodedText, toast:true, position:'top', timer:2000});
+                            }
+                            // Unlock after delay (1.5s) to prevent double scan
+                            setTimeout(() => { isProcessing = false; }, 1500);
                         } else {
-                            productForm.id = d;
+                            // Product form
+                            productForm.id = decodedText;
                             closeScanner();
+                            Swal.fire({icon: 'success', title: 'Barcode Terisi', timer: 1000, showConfirmButton: false, toast: true, position: 'top'});
                         }
                     };
+
+                    // Init & Config for Speed
+                    if(html5QrcodeScanner) html5QrcodeScanner.clear().catch(console.error);
+                    
                     html5QrcodeScanner = new Html5Qrcode("reader");
-                    html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onScanSuccess, () => {})
+                    const config = { 
+                        fps: 25, // INCREASED SPEED
+                        qrbox: { width: 250, height: 150 },
+                        aspectRatio: 1.0, 
+                        experimentalFeatures: { useBarCodeDetectorIfSupported: true } // TURBO MODE
+                    };
+                    
+                    html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, () => {})
                     .catch(() => {
-                         html5QrcodeScanner.start({ facingMode: "user" }, { fps: 10, qrbox: { width: 250, height: 150 } }, onScanSuccess, () => {});
+                        // Fallback to user camera if environment fails
+                        html5QrcodeScanner.start({ facingMode: "user" }, config, onScanSuccess, () => {});
                     });
                 });
             };
