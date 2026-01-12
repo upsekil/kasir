@@ -24,12 +24,27 @@
         .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
         .fade-enter-from, .fade-leave-to { opacity: 0; }
         
-        /* Print Styles */
+        /* Print Styles Khusus Thermal 58mm */
         @media print {
             @page { margin: 0; size: auto; }
             aside, main, .no-print, header, .fixed, .login-screen { display: none !important; }
-            body, #app { background: white !important; height: auto !important; width: 100% !important; display: block !important; position: static !important; }
-            #receipt-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; visibility: visible !important; }
+            body, #app { 
+                background: white !important; 
+                height: auto !important; 
+                width: 100% !important; 
+                display: block !important; 
+                position: static !important; 
+                overflow: visible !important;
+            }
+            #receipt-area { 
+                display: block !important; 
+                position: absolute; 
+                left: 0; top: 0; 
+                width: 100%; 
+                margin: 0;
+                padding: 0;
+                visibility: visible !important; 
+            }
         }
     </style>
 </head>
@@ -285,6 +300,23 @@
                                         <div><label class="block text-sm font-bold text-slate-600 mb-1">No HP</label><input v-model="settings.storePhone" type="text" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>
                                         <div><label class="block text-sm font-bold text-slate-600 mb-1">Sosial Media</label><input v-model="settings.socialMedia" type="text" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>
                                     </div>
+
+                                    <!-- PENGATURAN PRINTER -->
+                                    <div class="border-t border-slate-100 pt-4 mt-4">
+                                        <h3 class="font-bold text-indigo-600 mb-3"><i class="fas fa-print mr-2"></i>Pengaturan Printer</h3>
+                                        <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                                            <label class="block text-sm font-bold text-slate-600 mb-1">Ukuran Kertas Struk</label>
+                                            <select v-model="settings.printerSize" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white mb-2">
+                                                <option value="58mm">58mm (Thermal Kecil / GOOJPRT)</option>
+                                                <option value="80mm">80mm (Thermal Besar)</option>
+                                            </select>
+                                            <p class="text-[10px] text-slate-500">
+                                                * Untuk printer GOOJPRT 58mm di Android, gunakan aplikasi <strong>RawBT</strong> atau <strong>NokoPrint</strong> sebagai perantara.<br>
+                                                * Lebar area cetak otomatis disesuaikan ke 48mm agar tidak terpotong.
+                                            </p>
+                                        </div>
+                                    </div>
+
                                     <!-- KEAMANAN -->
                                     <div class="border-t border-slate-100 pt-4 mt-4">
                                         <h3 class="font-bold text-indigo-600 mb-3"><i class="fas fa-shield-alt mr-2"></i>Keamanan Aplikasi</h3>
@@ -333,9 +365,18 @@
         <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6"><h3 class="font-bold text-lg mb-4 text-slate-800">{{ isEditing ? 'Edit Produk' : 'Tambah Produk Baru' }}</h3><div class="space-y-3"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Barcode / ID</label><div class="relative"><input v-model="productForm.id" :disabled="isEditing" type="text" class="w-full p-2 pr-10 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Scan/Ketik..."><button @click="openScanner('product')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors" title="Scan Barcode"><i class="fas fa-camera"></i></button></div></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nama Produk</label><input v-model="productForm.name" type="text" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"></div><div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Harga</label><input v-model.number="productForm.price" type="number" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Stok</label><input v-model.number="productForm.stock" type="number" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"></div></div><div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kategori</label><select v-model="productForm.category" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"><option v-for="cat in categories.filter(c => c !== 'Semua')" :key="cat" :value="cat">{{ cat }}</option></select></div></div><div class="flex gap-2 mt-6 justify-end"><button @click="modals.product = false" class="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg">Batal</button><button @click="saveProduct" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow hover:bg-indigo-700">Simpan</button></div></div>
     </div>
 
-    <!-- Hidden Receipt -->
+    <!-- Hidden Receipt (Optimized for 58mm Thermal Printer) -->
     <div id="receipt-area" class="hidden">
-        <div :style="{ width: '100%', maxWidth: settings.printerSize, margin: '0 auto', textAlign: 'center', color: '#000', fontFamily: '\'Courier New\', monospace', fontSize: '12px' }">
+        <div :style="{ 
+            width: settings.printerSize === '58mm' ? '48mm' : '72mm', 
+            margin: '0 auto', 
+            padding: '0',
+            textAlign: 'center', 
+            color: '#000', 
+            fontFamily: '\'Courier New\', monospace', 
+            fontSize: settings.printerSize === '58mm' ? '10px' : '12px',
+            lineHeight: '1.2'
+        }">
             <img v-if="settings.storeLogo" :src="settings.storeLogo" style="max-width: 80%; height: auto; margin: 0 auto 5px auto; display: block; filter: grayscale(100%);">
             <div style="font-weight: bold; font-size: 16px; margin-bottom: 2px;">{{ settings.storeName }}</div>
             <div style="font-size: 10px; margin-bottom: 2px;">{{ settings.storeAddress }}</div>
@@ -389,7 +430,7 @@
                 socialMedia: '@f2cell_store',
                 cashierName: 'Admin',
                 footerMsg: 'Barang yang dibeli tidak dapat dikembalikan. Garansi Resmi.',
-                printerSize: '58mm',
+                printerSize: '58mm', // Default to 58mm for GOOJPRT
                 storeLogo: ''
             });
 
