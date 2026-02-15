@@ -13,15 +13,18 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .glass-effect { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
+        .modal-enter-from, .modal-leave-to { opacity: 0; }
         
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255,255,255,0.9); z-index: 9999;
@@ -33,25 +36,24 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes slide-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-        .animate-slide-in { animation: slide-in 0.3s ease-out; }
 
-        #receipt-canvas-container {
-            position: absolute; left: -9999px; top: -9999px;
+        @keyframes slide-in {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
         }
+        .animate-slide-in { animation: slide-in 0.3s ease-out; }
     </style>
 </head>
 <body>
     <div id="app" class="h-screen flex flex-col overflow-hidden">
         
-        <!-- HIDDEN ELEMENTS -->
-        <iframe id="receipt-frame" class="fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none"></iframe>
-        <div id="receipt-canvas-container"></div>
+        <!-- HIDDEN IFRAME FOR PRINTING -->
+        <iframe id="receipt-frame" class="fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-none"></iframe>
 
         <!-- Loading Indicator -->
         <div v-if="isLoading" class="loading-overlay">
             <div class="spinner mb-4"></div>
-            <p class="text-indigo-600 font-bold animate-pulse">{{ loadingMessage }}</p>
+            <p class="text-indigo-600 font-bold text-lg animate-pulse">{{ loadingMessage }}</p>
             <p v-if="loadingSubMessage" class="text-gray-500 text-sm mt-2">{{ loadingSubMessage }}</p>
         </div>
 
@@ -63,22 +65,24 @@
                         <i class="fas fa-store text-3xl text-white"></i>
                     </div>
                     <h1 class="text-2xl font-bold text-gray-800">F2POS Login</h1>
-                    <p class="text-gray-500 mt-2 text-sm">Aplikasi Kasir Cloud Google Sheet</p>
+                    <p class="text-gray-500 mt-2">Aplikasi Kasir Terintegrasi Google Sheet</p>
                 </div>
                 <form @submit.prevent="handleLogin" class="space-y-6">
                     <div>
-                        <label class="block text-xs font-bold text-gray-400 mb-2 uppercase">PIN Akses</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">PIN Akses</label>
                         <input type="password" v-model="loginPin" maxlength="6" 
-                            class="w-full px-4 py-4 rounded-xl border-2 border-gray-100 focus:border-indigo-500 transition-all text-center text-3xl tracking-widest outline-none"
+                            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-center text-2xl tracking-widest"
                             placeholder="••••••" required autofocus>
                     </div>
                     <button type="submit" 
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95">
-                        Masuk Ke Aplikasi
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold shadow-lg shadow-indigo-200 transition-all transform active:scale-95">
+                        Masuk Aplikasi
                     </button>
-                    <button type="button" @click="resetWebAppUrl" class="w-full text-xs text-gray-400 hover:text-indigo-600 underline text-center mt-2">
-                        Reset Database URL
-                    </button>
+                    <div class="text-center mt-4">
+                        <button type="button" @click="resetWebAppUrl" class="text-xs text-gray-400 hover:text-indigo-500 underline">
+                            Reset Database URL
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -86,29 +90,35 @@
         <!-- MAIN APP -->
         <div v-else class="flex h-full relative">
             
-            <!-- MOBILE MENU (DRAWER) -->
-            <div v-if="mobileMenuOpen" class="fixed inset-0 z-40 md:hidden">
-                <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" @click="mobileMenuOpen = false"></div>
-                <div class="fixed inset-y-0 left-0 w-72 bg-white shadow-2xl z-50 transform transition-transform animate-slide-in flex flex-col">
-                    <div class="p-6 border-b flex items-center justify-between">
+            <!-- MOBILE MENU OVERLAY (DRAWER) -->
+            <div v-if="mobileMenuOpen" class="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true">
+                <div class="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity" @click="mobileMenuOpen = false"></div>
+                <div class="fixed inset-y-0 left-0 flex flex-col w-64 bg-white shadow-xl z-50 transform transition-transform animate-slide-in">
+                    <div class="p-4 flex items-center justify-between border-b border-gray-100 h-16">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center"><i class="fas fa-bolt text-white text-xs"></i></div>
-                            <span class="font-bold text-xl">F2POS</span>
+                            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+                                <i class="fas fa-bolt text-white text-xs"></i>
+                            </div>
+                            <span class="font-bold text-lg text-gray-800">F2POS</span>
                         </div>
-                        <button @click="mobileMenuOpen = false" class="text-gray-400"><i class="fas fa-times text-xl"></i></button>
-                    </div>
-                    <nav class="flex-1 p-4 space-y-2">
-                        <button v-for="item in menuItems" :key="item.id" @click="activeTab = item.id; mobileMenuOpen = false" 
-                            class="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all"
-                            :class="activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'">
-                            <i :class="[item.icon, 'text-lg w-6']"></i>
-                            <span class="font-semibold">{{ item.label }}</span>
+                        <button @click="mobileMenuOpen = false" class="p-2 -mr-2 text-gray-500 hover:text-gray-700 rounded-lg">
+                            <i class="fas fa-times text-xl"></i>
                         </button>
+                    </div>
+                    <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                        <template v-for="item in menuItems" :key="item.id">
+                            <button @click="activeTab = item.id; mobileMenuOpen = false" 
+                                class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200"
+                                :class="activeTab === item.id ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:bg-gray-50'">
+                                <i :class="[item.icon, 'text-lg w-6 text-center']"></i>
+                                <span class="text-sm font-medium">{{ item.label }}</span>
+                            </button>
+                        </template>
                     </nav>
-                    <div class="p-4 border-t">
-                        <button @click="handleLogout" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50">
+                    <div class="p-4 border-t border-gray-100">
+                        <button @click="handleLogout" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all">
                             <i class="fas fa-sign-out-alt text-lg w-6"></i>
-                            <span class="font-semibold">Keluar Sesi</span>
+                            <span class="text-sm font-medium">Keluar</span>
                         </button>
                     </div>
                 </div>
@@ -116,202 +126,204 @@
 
             <!-- SIDEBAR (Desktop) -->
             <aside class="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 z-20 transition-all duration-300" :class="{'w-20': sidebarCollapsed}">
-                <div class="p-4 flex items-center justify-between border-b h-16">
+                <div class="p-4 flex items-center justify-between border-b border-gray-100 h-16">
                     <div class="flex items-center gap-3 overflow-hidden" v-if="!sidebarCollapsed">
-                        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0"><i class="fas fa-bolt text-white text-xs"></i></div>
-                        <span class="font-bold text-lg truncate">F2POS</span>
+                        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+                            <i class="fas fa-bolt text-white text-xs"></i>
+                        </div>
+                        <span class="font-bold text-lg text-gray-800 truncate">F2POS</span>
                     </div>
                     <button @click="sidebarCollapsed = !sidebarCollapsed" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
                         <i class="fas" :class="sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
                     </button>
                 </div>
-                <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <button v-for="item in menuItems" :key="item.id" @click="activeTab = item.id" 
-                        class="w-full flex items-center gap-4 px-3 py-3 rounded-xl transition-all group"
-                        :class="activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'">
-                        <i :class="[item.icon, 'text-lg w-6 text-center']"></i>
-                        <span v-if="!sidebarCollapsed" class="font-medium truncate">{{ item.label }}</span>
-                    </button>
+                <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                    <template v-for="item in menuItems" :key="item.id">
+                        <button @click="activeTab = item.id" 
+                            class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group"
+                            :class="activeTab === item.id ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-500 hover:bg-gray-50'">
+                            <i :class="[item.icon, 'text-lg w-6 text-center transition-colors', activeTab === item.id ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-600']"></i>
+                            <span v-if="!sidebarCollapsed" class="truncate">{{ item.label }}</span>
+                        </button>
+                    </template>
                 </nav>
-                <div class="p-4 border-t">
-                    <button @click="handleLogout" class="w-full flex items-center gap-4 px-3 py-3 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all">
-                        <i class="fas fa-sign-out-alt text-lg w-6 text-center"></i>
-                        <span v-if="!sidebarCollapsed" class="font-medium">Logout</span>
+                <div class="p-4 border-t border-gray-100">
+                    <button @click="handleLogout" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all">
+                        <i class="fas fa-sign-out-alt text-lg w-6"></i>
+                        <span v-if="!sidebarCollapsed">Keluar</span>
                     </button>
                 </div>
             </aside>
 
             <!-- CONTENT AREA -->
-            <main class="flex-1 flex flex-col relative min-w-0 bg-gray-50/30">
+            <main class="flex-1 flex flex-col relative min-w-0 bg-gray-50/50">
                 
                 <!-- HEADER -->
-                <header class="h-16 bg-white border-b flex items-center justify-between px-4 sm:px-8 sticky top-0 z-10">
+                <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-10 sticky top-0">
                     <div class="flex items-center gap-4">
-                        <button @click="mobileMenuOpen = true" class="md:hidden p-2 -ml-2 text-gray-500 rounded-lg active:bg-gray-100">
+                        <button @click="mobileMenuOpen = true" class="md:hidden p-2 -ml-2 text-gray-600 focus:outline-none rounded-lg hover:bg-gray-100">
                             <i class="fas fa-bars text-xl"></i>
                         </button>
-                        <h2 class="text-xl font-extrabold text-gray-800 tracking-tight">{{ pageTitle }}</h2>
-                        <span v-if="isOffline" class="bg-red-100 text-red-600 text-[10px] px-2 py-1 rounded-full font-black uppercase ml-2">Offline</span>
+                        <h2 class="text-xl font-bold text-gray-800 hidden sm:block">{{ pageTitle }}</h2>
                     </div>
-                    <div class="flex items-center gap-2 sm:gap-4">
-                        <button @click="loadData" class="p-2.5 rounded-xl bg-gray-50 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all" title="Sinkron Data">
+                    <div class="flex items-center gap-3">
+                        <button @click="loadData" class="p-2 rounded-full hover:bg-gray-100 text-gray-500" title="Sinkron Data">
                             <i class="fas fa-sync-alt" :class="{'fa-spin': isLoading}"></i>
                         </button>
-                        <div class="text-right hidden sm:block">
-                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ currentDate }}</div>
-                            <div class="text-sm font-black text-indigo-600">{{ currentTime }}</div>
+                        <div class="text-right hidden sm:block mr-2">
+                            <div class="text-xs text-gray-500">{{ currentDate }}</div>
+                            <div class="text-sm font-bold text-indigo-600">{{ currentTime }}</div>
                         </div>
-                        <button v-if="activeTab === 'pos'" @click="showMobileCart = true" class="md:hidden relative p-2 text-indigo-600 bg-indigo-50 rounded-xl">
-                            <i class="fas fa-shopping-basket text-xl"></i>
-                            <span v-if="cartTotalQty > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
+                        <button v-if="activeTab === 'pos'" @click="showMobileCart = !showMobileCart" class="relative p-2 md:hidden text-indigo-600">
+                            <i class="fas fa-shopping-cart text-xl"></i>
+                            <span v-if="cartTotalQty > 0" class="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
                                 {{ cartTotalQty }}
                             </span>
                         </button>
                     </div>
                 </header>
 
-                <div class="flex-1 overflow-y-auto p-4 sm:p-8 scroll-smooth">
+                <!-- DYNAMIC CONTENT -->
+                <div class="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth">
                     
-                    <!-- DASHBOARD -->
+                    <!-- 1. DASHBOARD -->
                     <div v-if="activeTab === 'dashboard'" class="space-y-6">
+                        <!-- Stat Cards Grid -->
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div v-for="(stat, index) in dashboardStats" :key="index" class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
-                                <div class="flex justify-between items-start mb-3">
-                                    <div :class="`w-10 h-10 rounded-2xl flex items-center justify-center ${stat.colorBg} ${stat.colorText}`">
+                            <div v-for="(stat, index) in dashboardStats" :key="index" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 transition-transform hover:scale-[1.02]">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div :class="`p-2 rounded-lg ${stat.colorBg} ${stat.colorText}`">
                                         <i :class="stat.icon"></i>
                                     </div>
-                                    <span class="text-[9px] font-black uppercase tracking-tighter text-gray-300">{{ stat.period }}</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">{{ stat.period }}</span>
                                 </div>
-                                <h3 class="text-xl md:text-2xl font-black text-gray-800 tracking-tight">{{ stat.value }}</h3>
-                                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">{{ stat.label }}</p>
+                                <h3 class="text-xl md:text-2xl font-bold text-gray-800">{{ stat.value }}</h3>
+                                <p class="text-xs text-gray-500">{{ stat.label }}</p>
                             </div>
                         </div>
 
+                        <!-- Laporan Mingguan, Bulanan, Tahunan Summary -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                             <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 rounded-3xl shadow-xl shadow-indigo-100 text-white relative overflow-hidden group">
-                                <i class="fas fa-calendar-week absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:scale-110 transition-transform"></i>
-                                <div class="text-xs font-bold opacity-70 mb-1 uppercase tracking-widest">Omset Minggu Ini</div>
-                                <div class="text-3xl font-black mb-4">{{ formatRupiah(statSummary.weekly) }}</div>
-                                <div class="inline-flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                                    <i class="fas fa-receipt"></i> {{ statSummary.weeklyCount }} Transaksi
-                                </div>
+                             <div class="bg-indigo-600 p-5 rounded-2xl shadow-lg text-white">
+                                <div class="text-sm opacity-80 mb-1">Omset Minggu Ini</div>
+                                <div class="text-2xl font-bold">{{ formatRupiah(statSummary.weekly) }}</div>
+                                <div class="text-xs mt-2 opacity-70">{{ statSummary.weeklyCount }} Transaksi</div>
                              </div>
-                             <div class="bg-gradient-to-br from-emerald-600 to-emerald-800 p-6 rounded-3xl shadow-xl shadow-emerald-100 text-white relative overflow-hidden group">
-                                <i class="fas fa-calendar-alt absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:scale-110 transition-transform"></i>
-                                <div class="text-xs font-bold opacity-70 mb-1 uppercase tracking-widest">Omset Bulan Ini</div>
-                                <div class="text-3xl font-black mb-4">{{ formatRupiah(statSummary.monthly) }}</div>
-                                <div class="inline-flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                                    <i class="fas fa-receipt"></i> {{ statSummary.monthlyCount }} Transaksi
-                                </div>
+                             <div class="bg-emerald-600 p-5 rounded-2xl shadow-lg text-white">
+                                <div class="text-sm opacity-80 mb-1">Omset Bulan Ini</div>
+                                <div class="text-2xl font-bold">{{ formatRupiah(statSummary.monthly) }}</div>
+                                <div class="text-xs mt-2 opacity-70">{{ statSummary.monthlyCount }} Transaksi</div>
                              </div>
-                             <div class="bg-gradient-to-br from-amber-600 to-amber-800 p-6 rounded-3xl shadow-xl shadow-amber-100 text-white relative overflow-hidden group">
-                                <i class="fas fa-globe absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:scale-110 transition-transform"></i>
-                                <div class="text-xs font-bold opacity-70 mb-1 uppercase tracking-widest">Omset Tahun Ini</div>
-                                <div class="text-3xl font-black mb-4">{{ formatRupiah(statSummary.yearly) }}</div>
-                                <div class="inline-flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                                    <i class="fas fa-receipt"></i> {{ statSummary.yearlyCount }} Transaksi
-                                </div>
+                             <div class="bg-orange-600 p-5 rounded-2xl shadow-lg text-white">
+                                <div class="text-sm opacity-80 mb-1">Omset Tahun Ini</div>
+                                <div class="text-2xl font-bold">{{ formatRupiah(statSummary.yearly) }}</div>
+                                <div class="text-xs mt-2 opacity-70">{{ statSummary.yearlyCount }} Transaksi</div>
                              </div>
                         </div>
 
-                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                            <div class="flex justify-between items-center mb-6">
-                                <h3 class="font-black text-gray-700 uppercase text-xs tracking-widest">Grafik Penjualan 7 Hari</h3>
+                        <!-- Chart Area -->
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-gray-700">Grafik Penjualan (7 Hari Terakhir)</h3>
+                                <button @click="loadData" class="text-xs text-indigo-600 hover:underline">Perbarui Data</button>
                             </div>
-                            <div class="h-72">
+                            <div class="h-64">
                                 <canvas id="salesChart"></canvas>
                             </div>
                         </div>
                     </div>
 
-                    <!-- KASIR / POS -->
+                    <!-- 2. POS (Point of Sale) -->
                     <div v-if="activeTab === 'pos'" class="h-full flex flex-col md:flex-row gap-6">
                         <div class="flex-1 flex flex-col h-full overflow-hidden">
-                            <div class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 mb-4 space-y-4">
-                                <div class="relative group">
-                                    <i class="fas fa-search absolute left-4 top-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors"></i>
-                                    <input v-model="searchQuery" class="w-full pl-12 pr-12 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 font-medium transition-all" placeholder="Cari nama produk / scan barcode...">
-                                    <button @click="openScanner" class="absolute right-3 top-3 w-10 h-10 flex items-center justify-center bg-white text-gray-400 rounded-xl shadow-sm border hover:text-indigo-600 active:scale-90 transition-all">
-                                        <i class="fas fa-barcode"></i>
+                            <!-- Search & Category -->
+                            <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-4 space-y-3">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-4 top-3.5 text-gray-400"></i>
+                                    <input v-model="searchQuery" class="w-full pl-11 pr-12 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500" placeholder="Cari nama produk atau scan barcode...">
+                                    <button @click="openScanner" class="absolute right-3 top-2.5 p-1 text-gray-500 hover:text-indigo-600">
+                                        <i class="fas fa-barcode text-xl"></i>
                                     </button>
                                 </div>
                                 <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-                                    <button @click="activeCategory = 'all'" :class="['px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all', activeCategory === 'all' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200']">Semua</button>
-                                    <button v-for="cat in categories" :key="cat.id" @click="activeCategory = cat.name" :class="['px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all', activeCategory === cat.name ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200']">{{ cat.name }}</button>
+                                    <button @click="activeCategory = 'all'" :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors', activeCategory === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']">Semua</button>
+                                    <button v-for="cat in categories" :key="cat.id" @click="activeCategory = cat.name" :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors', activeCategory === cat.name ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']">{{ cat.name }}</button>
                                 </div>
                             </div>
-                            
-                            <div class="flex-1 overflow-y-auto pr-2">
-                                <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 pb-20 md:pb-6">
-                                    <div v-for="product in filteredProducts" :key="product.id" @click="addToCart(product)" class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 transition-all group flex flex-col items-center text-center">
-                                        <div class="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center text-5xl mb-3 text-gray-200 group-hover:text-indigo-100 transition-colors">
+                            <!-- Product Grid -->
+                            <div class="flex-1 overflow-y-auto">
+                                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-20 md:pb-4">
+                                    <div v-for="product in filteredProducts" :key="product.id" @click="addToCart(product)" class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+                                        <div class="h-24 flex items-center justify-center text-4xl mb-2 text-gray-200 group-hover:scale-110 transition-transform">
                                             <i class="fas fa-box"></i>
                                         </div>
-                                        <h4 class="font-bold text-gray-800 text-sm line-clamp-2 min-h-[2.5rem]">{{ product.name }}</h4>
-                                        <div class="mt-3 w-full">
-                                            <div class="text-indigo-600 font-black text-base">{{ formatRupiah(product.sellingPrice) }}</div>
-                                            <div :class="['text-[10px] font-black mt-1 px-2 py-0.5 rounded-full inline-block uppercase', product.stock <= 5 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-emerald-500']">Stok: {{ product.stock }}</div>
+                                        <h4 class="font-semibold text-gray-800 text-sm line-clamp-2 min-h-[2.5em]">{{ product.name }}</h4>
+                                        <div class="flex justify-between items-center mt-2">
+                                            <span class="text-indigo-600 font-bold text-sm">{{ formatRupiah(product.sellingPrice) }}</span>
+                                            <span :class="['text-[10px] font-bold px-1.5 py-0.5 rounded', product.stock <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600']">Stok: {{ product.stock }}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Sidebar Keranjang -->
-                        <div :class="['fixed md:static inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl md:shadow-none md:border-l border-gray-100 z-30 transform transition-transform duration-300 flex flex-col', showMobileCart ? 'translate-x-0' : 'translate-x-full md:translate-x-0']">
-                            <div class="p-6 border-b flex items-center justify-between h-16">
-                                <h3 class="font-black text-gray-800 uppercase tracking-widest text-sm">Keranjang</h3>
-                                <button @click="showMobileCart = false" class="md:hidden p-2 text-gray-400"><i class="fas fa-times"></i></button>
+                        <!-- Cart Sidebar -->
+                        <div :class="['fixed md:static inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl md:shadow-none md:border-l border-gray-200 z-30 transform transition-transform duration-300 flex flex-col', showMobileCart ? 'translate-x-0' : 'translate-x-full md:translate-x-0']">
+                            <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                                <h3 class="font-bold text-lg text-gray-800">Keranjang</h3>
+                                <button @click="showMobileCart = false" class="md:hidden p-2 text-gray-500"><i class="fas fa-times"></i></button>
                             </div>
                             <div class="flex-1 overflow-y-auto p-4 space-y-4">
-                                <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-gray-200 opacity-50 uppercase font-black text-xs tracking-widest">Kosong</div>
-                                <div v-for="(item, index) in cart" :key="index" class="flex gap-4 p-4 bg-gray-50 rounded-2xl relative group">
+                                <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-gray-300">
+                                    <i class="fas fa-shopping-basket text-6xl mb-4 opacity-20"></i>
+                                    <p>Keranjang kosong</p>
+                                </div>
+                                <div v-for="(item, index) in cart" :key="index" class="flex gap-3 relative group bg-gray-50 p-3 rounded-xl">
                                     <div class="flex-1">
-                                        <h4 class="font-bold text-gray-800 text-sm mb-1 truncate pr-6">{{ item.name }}</h4>
-                                        <div class="text-xs text-indigo-600 font-black">{{ formatRupiah(item.sellingPrice) }}</div>
-                                        <div class="flex items-center gap-4 mt-3">
-                                            <button @click="updateQty(item, -1)" class="w-8 h-8 rounded-lg bg-white border flex items-center justify-center active:scale-90">-</button>
-                                            <span class="text-sm font-black">{{ item.qty }}</span>
-                                            <button @click="updateQty(item, 1)" class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center active:scale-90">+</button>
+                                        <h4 class="font-medium text-gray-800 text-sm line-clamp-1">{{ item.name }}</h4>
+                                        <p class="text-xs text-indigo-600 font-bold mb-2">{{ formatRupiah(item.sellingPrice) }}</p>
+                                        <div class="flex items-center gap-3">
+                                            <button @click="updateQty(item, -1)" class="w-6 h-6 rounded bg-white border flex items-center justify-center text-xs">-</button>
+                                            <span class="text-sm font-bold">{{ item.qty }}</span>
+                                            <button @click="updateQty(item, 1)" class="w-6 h-6 rounded bg-indigo-600 text-white flex items-center justify-center text-xs">+</button>
                                         </div>
                                     </div>
-                                    <button @click="removeFromCart(index)" class="absolute top-4 right-4 text-gray-300 hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
+                                    <button @click="removeFromCart(index)" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button>
                                 </div>
                             </div>
-                            <div class="p-6 bg-white border-t space-y-4">
-                                <div class="flex justify-between items-end">
-                                    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Bayar</span>
-                                    <span class="text-3xl font-black text-indigo-600 tracking-tighter">{{ formatRupiah(cartSubtotal) }}</span>
+                            <div class="p-4 bg-gray-50 border-t">
+                                <div class="flex justify-between mb-4 text-xl font-bold">
+                                    <span>Total</span>
+                                    <span class="text-indigo-600">{{ formatRupiah(cartSubtotal) }}</span>
                                 </div>
-                                <div class="grid grid-cols-2 gap-3 pt-2">
-                                    <button @click="clearCart" :disabled="cart.length === 0" class="py-4 rounded-2xl border-2 border-red-50 font-bold text-red-400 active:scale-95">BATAL</button>
-                                    <button @click="openCheckout" :disabled="cart.length === 0" class="py-4 rounded-2xl bg-indigo-600 text-white font-black active:scale-95 disabled:opacity-50">BAYAR</button>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <button @click="clearCart" :disabled="cart.length === 0" class="py-3 rounded-xl border font-medium hover:bg-red-50 text-red-500 disabled:opacity-30">Batal</button>
+                                    <button @click="openCheckout" :disabled="cart.length === 0" class="py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50">Bayar</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- STOK PRODUK -->
-                    <div v-if="activeTab === 'products'" class="space-y-6">
-                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div class="relative w-full sm:w-64">
-                                <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i>
-                                <input v-model="searchQuery" class="w-full pl-9 pr-4 py-2.5 rounded-xl border text-xs outline-none" placeholder="Cari data stok...">
+                    <!-- 3. PRODUCTS MANAGEMENT -->
+                    <div v-if="activeTab === 'products'" class="space-y-4">
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+                            <div class="relative max-w-xs w-full">
+                                <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
+                                <input v-model="searchQuery" class="w-full pl-9 pr-4 py-2 rounded-xl border shadow-sm focus:ring-indigo-500 text-sm" placeholder="Cari produk...">
                             </div>
-                            <div class="flex gap-2 w-full sm:w-auto overflow-x-auto pb-1 hide-scrollbar">
-                                <button @click="downloadTemplate" class="bg-gray-100 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">Template</button>
-                                <button @click="$refs.fileInput.click()" class="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">Import</button>
+                            <div class="flex gap-2 w-full md:w-auto overflow-x-auto hide-scrollbar">
+                                <button @click="downloadTemplate" class="bg-gray-100 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap"><i class="fas fa-file-download mr-1"></i> Template</button>
+                                <button @click="$refs.fileInput.click()" class="bg-green-600 text-white px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap"><i class="fas fa-file-upload mr-1"></i> Import</button>
                                 <input type="file" ref="fileInput" class="hidden" @change="importProducts">
-                                <button @click="openProductModal()" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100">Tambah</button>
+                                <button @click="exportProducts" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold"><i class="fas fa-file-export mr-1"></i> Export</button>
+                                <button @click="openProductModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">Tambah</button>
                             </div>
                         </div>
-
-                        <!-- DESKTOP TABLE -->
-                        <div class="hidden md:block bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
                             <table class="w-full text-left text-sm">
                                 <thead class="bg-gray-50 border-b">
-                                    <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                        <th class="px-6 py-4">Nama Produk</th>
+                                    <tr>
+                                        <th class="px-6 py-4">Produk</th>
                                         <th class="px-6 py-4">Kategori</th>
                                         <th class="px-6 py-4 text-right">Harga Jual</th>
                                         <th class="px-6 py-4 text-center">Stok</th>
@@ -320,55 +332,38 @@
                                 </thead>
                                 <tbody class="divide-y">
                                     <tr v-for="product in filteredProducts" :key="product.id" class="hover:bg-gray-50">
-                                        <td class="px-6 py-4">
-                                            <div class="font-bold text-gray-800">{{ product.name }}</div>
-                                            <div class="text-[10px] font-mono text-gray-400">{{ product.barcode }}</div>
-                                        </td>
-                                        <td class="px-6 py-4"><span class="bg-gray-100 px-2 py-0.5 rounded-md text-[10px] font-black uppercase">{{ product.category }}</span></td>
-                                        <td class="px-6 py-4 text-right font-black text-indigo-600">{{ formatRupiah(product.sellingPrice) }}</td>
-                                        <td class="px-6 py-4 text-center font-black" :class="product.stock <= 5 ? 'text-red-500' : 'text-emerald-500'">{{ product.stock }}</td>
+                                        <td class="px-6 py-4 font-medium">{{ product.name }}<br><span class="text-xs text-gray-400">{{product.barcode}}</span></td>
+                                        <td class="px-6 py-4"><span class="bg-gray-100 px-2 py-1 rounded text-xs">{{ product.category }}</span></td>
+                                        <td class="px-6 py-4 text-right font-bold">{{ formatRupiah(product.sellingPrice) }}</td>
                                         <td class="px-6 py-4 text-center">
-                                            <button @click="openProductModal(product)" class="p-2 text-blue-500"><i class="fas fa-edit"></i></button>
-                                            <button @click="deleteProduct(product.id)" class="p-2 text-red-500"><i class="fas fa-trash-alt"></i></button>
+                                            <span :class="['px-2 py-1 rounded-full text-[10px] font-bold', product.stock <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600']">{{ product.stock }}</span>
+                                        </td>
+                                        <td class="px-6 py-4 text-center">
+                                            <button @click="openProductModal(product)" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg mr-1"><i class="fas fa-edit"></i></button>
+                                            <button @click="deleteProduct(product.id)" class="p-2 text-red-500 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-
-                        <!-- MOBILE CARDS -->
-                        <div class="md:hidden space-y-3 pb-10">
-                            <div v-for="product in filteredProducts" :key="product.id" class="bg-white p-4 rounded-2xl border flex items-center justify-between">
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-black text-gray-800 truncate">{{ product.name }}</div>
-                                    <div class="text-[10px] text-gray-400">{{ product.barcode }} | {{ product.category }}</div>
-                                    <div class="text-indigo-600 font-black mt-1">{{ formatRupiah(product.sellingPrice) }}</div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <div :class="['w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs', product.stock <= 5 ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600']">{{ product.stock }}</div>
-                                    <button @click="openProductModal(product)" class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-500 rounded-lg"><i class="fas fa-edit"></i></button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- RIWAYAT JUAL -->
-                    <div v-if="activeTab === 'transactions'" class="space-y-6">
-                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div class="flex gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 hide-scrollbar">
+                     <!-- 4. TRANSACTIONS -->
+                     <div v-if="activeTab === 'transactions'" class="space-y-4">
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+                            <div class="flex gap-2">
                                 <button v-for="p in ['Semua', 'Minggu Ini', 'Bulan Ini', 'Tahun Ini']" 
                                     @click="trxPeriod = p"
-                                    :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border whitespace-nowrap', trxPeriod === p ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-gray-400 hover:border-gray-300']">
+                                    :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition-all', trxPeriod === p ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border']">
                                     {{ p }}
                                 </button>
                             </div>
-                            <button @click="exportTransactions" class="w-full sm:w-auto bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest">Export Excel</button>
+                            <button @click="exportTransactions" class="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold"><i class="fas fa-file-excel mr-2"></i>Export Laporan</button>
                         </div>
-
-                        <div class="bg-white rounded-3xl shadow-sm border overflow-hidden">
+                        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
                             <table class="w-full text-left text-sm">
                                 <thead class="bg-gray-50 border-b">
-                                    <tr class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <tr>
                                         <th class="px-6 py-4">Invoice</th>
                                         <th class="px-6 py-4">Waktu</th>
                                         <th class="px-6 py-4 text-right">Total</th>
@@ -377,17 +372,14 @@
                                 </thead>
                                 <tbody class="divide-y">
                                     <tr v-for="trx in filteredTransactions" :key="trx.invoice" class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 font-mono font-bold text-xs text-gray-600">{{ trx.invoice }}</td>
-                                        <td class="px-6 py-4">
-                                            <div class="font-bold text-gray-800 text-xs">{{ trx.date }}</div>
-                                            <div class="text-[10px] text-gray-400">{{ trx.time }}</div>
+                                        <td class="px-6 py-4 font-mono text-xs uppercase">{{ trx.invoice }}</td>
+                                        <td class="px-6 py-4 text-gray-600">
+                                            <div class="font-medium text-xs">{{ trx.date }}</div>
+                                            <div class="text-[10px] opacity-60">{{ trx.time }}</div>
                                         </td>
-                                        <td class="px-6 py-4 text-right font-black text-indigo-600">{{ formatRupiah(trx.total) }}</td>
+                                        <td class="px-6 py-4 text-right font-bold text-indigo-600">{{ formatRupiah(trx.total) }}</td>
                                         <td class="px-6 py-4 text-center">
-                                            <div class="flex justify-center gap-1">
-                                                <button @click="printReceipt(trx)" class="p-2 text-gray-400 hover:text-indigo-600"><i class="fas fa-print"></i></button>
-                                                <button @click="saveReceiptImage(trx)" class="p-2 text-gray-400 hover:text-emerald-600"><i class="fas fa-image"></i></button>
-                                            </div>
+                                             <button @click="printReceipt(trx)" class="p-2 text-gray-400 hover:text-indigo-600"><i class="fas fa-print"></i></button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -395,33 +387,36 @@
                         </div>
                     </div>
 
-                    <!-- PENGATURAN -->
-                    <div v-if="activeTab === 'settings'" class="max-w-2xl mx-auto space-y-6 pb-20">
-                        <div class="bg-white p-8 rounded-[2rem] shadow-sm border">
-                            <h3 class="font-black text-xl mb-6 border-b pb-4 text-gray-800 uppercase tracking-widest">Konfigurasi</h3>
-                            <div class="space-y-6">
-                                <div class="flex flex-col items-center gap-4 bg-gray-50 p-6 rounded-3xl border-2 border-dashed">
-                                    <div class="w-24 h-24 bg-white rounded-2xl flex items-center justify-center overflow-hidden border-2 border-white shadow-lg relative">
+                    <!-- 5. SETTINGS -->
+                    <div v-if="activeTab === 'settings'" class="max-w-2xl mx-auto space-y-6 pb-10">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border">
+                            <h3 class="font-bold text-lg mb-4 border-b pb-2">Pengaturan Toko</h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
+                                    <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden border">
                                         <img v-if="settings.logo" :src="settings.logo" class="w-full h-full object-contain">
-                                        <i v-else class="fas fa-store text-gray-200 text-4xl"></i>
+                                        <i v-else class="fas fa-image text-gray-300 text-2xl"></i>
                                     </div>
-                                    <button @click="$refs.logoInput.click()" class="bg-white px-6 py-2 rounded-xl text-[10px] font-black uppercase border shadow-sm">Ganti Logo Cloud</button>
-                                    <input type="file" ref="logoInput" class="hidden" accept="image/*" @change="handleLogoUpload">
+                                    <div class="flex-1">
+                                        <h4 class="text-sm font-medium">Logo Struk</h4>
+                                        <div class="flex gap-2 mt-2">
+                                            <button @click="$refs.logoInput.click()" class="px-3 py-1 bg-white border rounded-lg text-xs font-medium">Upload</button>
+                                            <button v-if="settings.logo" @click="settings.logo = ''" class="px-3 py-1 text-red-500 text-xs">Hapus</button>
+                                        </div>
+                                        <input type="file" ref="logoInput" class="hidden" accept="image/*" @change="handleLogoUpload">
+                                    </div>
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div><label class="block text-[10px] font-black text-gray-400 mb-2 uppercase">Nama Toko</label><input v-model="settings.storeName" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
-                                    <div><label class="block text-[10px] font-black text-gray-400 mb-2 uppercase">PIN Masuk</label><input v-model="settings.pin" maxlength="6" class="w-full px-4 py-3 border rounded-xl font-bold tracking-widest"></div>
-                                </div>
-                                <div><label class="block text-[10px] font-black text-gray-400 mb-2 uppercase">Alamat Toko</label><textarea v-model="settings.storeAddress" class="w-full px-4 py-3 border rounded-xl font-bold" rows="2"></textarea></div>
-                                <div><label class="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Pesan Penutup</label><input v-model="settings.receiptFooter" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
-                                <div class="pt-6 border-t">
-                                     <label class="block text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-widest">Apps Script URL (Database)</label>
+                                <div><label class="block text-xs font-bold text-gray-500 mb-1">Nama Toko</label><input v-model="settings.storeName" class="w-full px-4 py-2 border rounded-xl"></div>
+                                <div><label class="block text-xs font-bold text-gray-500 mb-1">Alamat</label><textarea v-model="settings.storeAddress" class="w-full px-4 py-2 border rounded-xl" rows="2"></textarea></div>
+                                <div><label class="block text-xs font-bold text-gray-500 mb-1">Footer Struk</label><input v-model="settings.receiptFooter" class="w-full px-4 py-2 border rounded-xl"></div>
+                                <div class="pt-4 border-t mt-4">
+                                     <label class="block text-xs font-bold text-indigo-500 mb-1">URL Google Database</label>
                                      <div class="flex gap-2">
-                                        <input v-model="inputUrl" class="flex-1 px-4 py-3 border rounded-xl font-mono text-[10px] truncate" placeholder="https://script.google.com/...">
-                                        <button @click="copyDbUrl" class="w-12 h-12 flex items-center justify-center bg-gray-100 rounded-xl"><i class="fas fa-copy"></i></button>
+                                        <input v-model="inputUrl" class="flex-1 px-4 py-2 border rounded-xl font-mono text-xs truncate" placeholder="https://script.google.com/...">
+                                        <button @click="copyDbUrl" class="px-4 py-2 bg-gray-100 rounded-xl"><i class="fas fa-copy"></i></button>
                                      </div>
                                 </div>
-                                <button @click="saveSettings" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg uppercase tracking-widest active:scale-95">Simpan Perubahan Cloud</button>
+                                <button @click="saveSettings" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mt-4">Simpan Pengaturan</button>
                             </div>
                         </div>
                     </div>
@@ -431,57 +426,60 @@
         </div>
 
         <!-- MODAL CHECKOUT -->
-        <div v-if="modals.checkout" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-sm">
-            <div class="bg-white w-full sm:w-[450px] rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 animate-slide-up">
-                <div class="flex justify-between items-center mb-8">
-                    <h3 class="text-2xl font-black text-gray-800 tracking-tight">Checkout</h3>
-                    <button @click="modals.checkout = false"><i class="fas fa-times"></i></button>
+        <div v-if="modals.checkout" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4 sm:p-0 backdrop-blur-sm">
+            <div class="bg-white w-full sm:w-[450px] rounded-t-2xl sm:rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Pembayaran</h3>
+                    <button @click="modals.checkout = false" class="text-gray-400"><i class="fas fa-times"></i></button>
                 </div>
-                <div class="text-center mb-10 bg-indigo-50 py-8 px-4 rounded-[2rem]">
-                    <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Total Tagihan</p>
-                    <h2 class="text-5xl font-black text-indigo-600 tracking-tighter">{{ formatRupiah(cartSubtotal) }}</h2>
+                <div class="text-center mb-8 bg-indigo-50 py-6 rounded-2xl">
+                    <p class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Tagihan</p>
+                    <h2 class="text-4xl font-bold text-indigo-600">{{ formatRupiah(cartSubtotal) }}</h2>
                 </div>
-                <div class="space-y-6">
-                    <input type="number" v-model="cashReceived" id="cashInput" class="w-full px-6 py-5 text-4xl font-black border-2 rounded-3xl text-center outline-none focus:border-indigo-600 transition-all" placeholder="0">
-                    <div class="grid grid-cols-3 gap-3">
-                        <button @click="cashReceived = cartSubtotal" class="py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase">Pas</button>
-                        <button v-for="amt in [50000, 100000]" @click="cashReceived = amt" class="py-3 bg-gray-50 border rounded-2xl font-black text-[10px] uppercase">{{ formatRupiah(amt) }}</button>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Uang Diterima</label>
+                        <input type="number" v-model="cashReceived" id="cashInput" class="w-full px-4 py-3 text-xl font-bold border rounded-xl focus:ring-2 focus:ring-indigo-500" placeholder="0">
                     </div>
-                    <div v-if="cashReceived > 0" class="flex justify-between items-center px-6 py-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                        <span class="text-[10px] font-black text-emerald-600 uppercase">Kembalian</span>
-                        <span class="text-2xl font-black text-emerald-600 tracking-tighter">{{ formatRupiah(Math.max(0, cashReceived - cartSubtotal)) }}</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button @click="cashReceived = cartSubtotal" class="py-2 bg-gray-100 rounded-lg text-xs font-bold">Uang Pas</button>
+                        <button v-for="amt in [50000, 100000]" @click="cashReceived = amt" class="py-2 bg-gray-100 rounded-lg text-xs font-bold">{{ formatRupiah(amt) }}</button>
                     </div>
-                    <button @click="processTransaction" :disabled="cashReceived < cartSubtotal" class="w-full bg-gray-900 text-white py-5 rounded-3xl font-black text-lg uppercase tracking-widest disabled:opacity-30">Selesaikan Transaksi</button>
+                    <div v-if="cashReceived > 0" class="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                        <span class="text-xs font-bold text-gray-500">KEMBALIAN</span>
+                        <span class="text-xl font-bold text-indigo-600">{{ formatRupiah(Math.max(0, cashReceived - cartSubtotal)) }}</span>
+                    </div>
+                    <button @click="processTransaction" :disabled="cashReceived < cartSubtotal" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50">Bayar & Cetak</button>
                 </div>
             </div>
         </div>
 
         <!-- MODAL PRODUK -->
-        <div v-if="modals.product" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">
-            <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative">
-                <h3 class="text-2xl font-black mb-6 text-gray-800 tracking-tight uppercase">{{ isEditing ? 'Edit Data' : 'Tambah Baru' }}</h3>
-                <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-2 hide-scrollbar">
-                    <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Barcode</label><div class="flex gap-2"><input v-model="productForm.barcode" class="flex-1 px-4 py-3 border rounded-xl font-bold"><button @click="openScanner" class="w-12 h-12 flex items-center justify-center bg-gray-50 border rounded-xl"><i class="fas fa-barcode text-gray-400"></i></button></div></div>
-                    <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Nama Produk</label><input v-model="productForm.name" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
-                    <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Kategori</label><select v-model="productForm.category" class="w-full px-4 py-3 border rounded-xl font-bold"><option v-for="cat in categories" :value="cat.name">{{ cat.name }}</option></select></div>
+        <div v-if="modals.product" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <h3 class="text-xl font-bold mb-4 border-b pb-2">{{ isEditing ? 'Edit Produk' : 'Tambah Produk Baru' }}</h3>
+                <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">BARCODE / SKU</label><div class="flex gap-2"><input v-model="productForm.barcode" class="flex-1 px-3 py-2 border rounded-lg focus:ring-indigo-500"><button @click="openScanner" class="px-3 bg-gray-100 rounded-lg"><i class="fas fa-barcode"></i></button></div></div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">NAMA PRODUK</label><input v-model="productForm.name" class="w-full px-3 py-2 border rounded-lg focus:ring-indigo-500"></div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">KATEGORI</label><select v-model="productForm.category" class="w-full px-3 py-2 border rounded-lg"><option v-for="cat in categories" :value="cat.name">{{ cat.name }}</option></select></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Hrg Beli</label><input type="number" v-model="productForm.purchasePrice" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
-                        <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Hrg Jual</label><input type="number" v-model="productForm.sellingPrice" class="w-full px-4 py-3 border rounded-xl font-bold text-indigo-600"></div>
+                        <div><label class="text-xs font-bold text-gray-400 block mb-1">HARGA BELI</label><input type="number" v-model="productForm.purchasePrice" class="w-full px-3 py-2 border rounded-lg"></div>
+                        <div><label class="text-xs font-bold text-gray-400 block mb-1">HARGA JUAL</label><input type="number" v-model="productForm.sellingPrice" class="w-full px-3 py-2 border rounded-lg"></div>
                     </div>
-                    <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Stok</label><input v-model="productForm.stock" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">STOK SAAT INI</label><input type="number" v-model="productForm.stock" class="w-full px-3 py-2 border rounded-lg"></div>
                 </div>
-                <div class="flex gap-3 mt-8">
-                    <button @click="modals.product = false" class="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400 uppercase">Batal</button>
-                    <button @click="saveProduct" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest active:scale-95">Simpan</button>
+                <div class="flex gap-3 mt-6">
+                    <button @click="modals.product = false" class="flex-1 py-3 border rounded-xl font-bold text-gray-500">Batal</button>
+                    <button @click="saveProduct" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold">Simpan Data</button>
                 </div>
             </div>
         </div>
 
         <!-- SCANNER MODAL -->
-        <div v-if="modals.scanner" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/95">
-            <div class="w-full max-w-lg relative p-4">
-                <div id="reader" class="w-full overflow-hidden rounded-3xl border-4 border-white/20"></div>
-                <button @click="closeScanner" class="absolute -top-12 right-4 w-12 h-12 flex items-center justify-center bg-white/10 text-white rounded-full"><i class="fas fa-times"></i></button>
+        <div v-if="modals.scanner" class="fixed inset-0 z-50 flex items-center justify-center bg-black">
+            <div class="w-full max-w-lg relative">
+                <div id="reader" class="w-full"></div>
+                <button @click="closeScanner" class="absolute top-4 right-4 bg-white/20 text-white p-2 rounded-full"><i class="fas fa-times text-xl"></i></button>
             </div>
         </div>
 
@@ -492,22 +490,14 @@
 
         createApp({
             setup() {
-                // --- DATABASE ---
                 const WEB_APP_URL = ref(localStorage.getItem('f2pos_api_url') || 'https://script.google.com/macros/s/AKfycbxR9EESzj6BonqTwyEqni9IJHhGX3vq4WZPctgk7gFJtvOrUuybIrWaNbpDFMqZAWx69A/exec');
                 const inputUrl = ref(WEB_APP_URL.value);
-                
-                // --- STATUS APP ---
                 const isLoading = ref(false);
-                const loadingMessage = ref('Memuat Data...');
+                const loadingMessage = ref('Memuat...');
                 const loadingSubMessage = ref('');
                 const isOffline = ref(!navigator.onLine);
                 const isLoggedIn = ref(false);
                 const loginPin = ref('');
-                
-                window.addEventListener('online', () => isOffline.value = false);
-                window.addEventListener('offline', () => isOffline.value = true);
-
-                // --- UI STATE ---
                 const sidebarCollapsed = ref(false);
                 const mobileMenuOpen = ref(false);
                 const showMobileCart = ref(false);
@@ -517,9 +507,7 @@
                 const products = ref([]);
                 const categories = ref([]);
                 const transactions = ref([]);
-                const settings = reactive({ 
-                    storeName: 'F2 CELL', storeAddress: 'Jl. Contoh No. 123', receiptFooter: 'Terima Kasih', pin: '123456', logo: '' 
-                });
+                const settings = reactive({ storeName: 'F2 CELL', storeAddress: 'Jl. Contoh No. 123', receiptFooter: 'Terima Kasih', pin: '123456', logo: localStorage.getItem('f2pos_logo') || '' });
 
                 const cart = ref([]);
                 const searchQuery = ref('');
@@ -530,33 +518,48 @@
                 const productForm = reactive({ id: null, barcode: '', name: '', category: 'Umum', purchasePrice: 0, sellingPrice: 0, stock: 0 });
                 let html5QrcodeScanner = null;
 
-                // --- STATS ---
+                // --- COMPUTED STATS ---
                 const statSummary = computed(() => {
                     const now = new Date();
-                    const getTrx = (type) => transactions.value.filter(t => {
-                        const d = new Date(t.date);
-                        if (type === 'week') return (now - d) / (1000 * 3600 * 24) <= 7;
-                        if (type === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                        if (type === 'year') return d.getFullYear() === now.getFullYear();
-                        return false;
-                    });
-                    const w = getTrx('week'); const m = getTrx('month'); const y = getTrx('year');
+                    
+                    // Helper function: check if date is within last X days or same month/year
+                    const getPeriodTrx = (type) => {
+                        return transactions.value.filter(t => {
+                            const d = new Date(t.date);
+                            if (type === 'week') {
+                                const diff = (now - d) / (1000 * 60 * 60 * 24);
+                                return diff <= 7;
+                            }
+                            if (type === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                            if (type === 'year') return d.getFullYear() === now.getFullYear();
+                            return false;
+                        });
+                    };
+
+                    const weekly = getPeriodTrx('week');
+                    const monthly = getPeriodTrx('month');
+                    const yearly = getPeriodTrx('year');
+
                     return {
-                        weekly: w.reduce((s, t) => s + Number(t.total), 0), weeklyCount: w.length,
-                        monthly: m.reduce((s, t) => s + Number(t.total), 0), monthlyCount: m.length,
-                        yearly: y.reduce((s, t) => s + Number(t.total), 0), yearlyCount: y.length
+                        weekly: weekly.reduce((s, t) => s + Number(t.total), 0),
+                        weeklyCount: weekly.length,
+                        monthly: monthly.reduce((s, t) => s + Number(t.total), 0),
+                        monthlyCount: monthly.length,
+                        yearly: yearly.reduce((s, t) => s + Number(t.total), 0),
+                        yearlyCount: yearly.length
                     };
                 });
 
                 const dashboardStats = computed(() => {
-                    const today = new Date().toISOString().slice(0, 10);
-                    const tTrx = transactions.value.filter(t => t.date === today);
-                    const tSum = tTrx.reduce((s, t) => s + Number(t.total), 0);
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const todayTrx = transactions.value.filter(t => t.date === todayStr);
+                    const todayTotal = todayTrx.reduce((s, t) => s + Number(t.total), 0);
+
                     return [
-                        { label: 'Omset Hari Ini', value: formatRupiah(tSum), icon: 'fas fa-wallet', colorBg: 'bg-indigo-100', colorText: 'text-indigo-600', period: 'Hari Ini' },
-                        { label: 'Penjualan', value: tTrx.length, icon: 'fas fa-receipt', colorBg: 'bg-blue-100', colorText: 'text-blue-600', period: 'Hari Ini' },
+                        { label: 'Omset Hari Ini', value: formatRupiah(todayTotal), icon: 'fas fa-wallet', colorBg: 'bg-indigo-100', colorText: 'text-indigo-600', period: 'Hari Ini' },
+                        { label: 'Total Transaksi', value: todayTrx.length, icon: 'fas fa-shopping-bag', colorBg: 'bg-blue-100', colorText: 'text-blue-600', period: 'Hari Ini' },
                         { label: 'Omset Bulan Ini', value: formatRupiah(statSummary.value.monthly), icon: 'fas fa-chart-line', colorBg: 'bg-emerald-100', colorText: 'text-emerald-600', period: 'Bulan Ini' },
-                        { label: 'Stok Menipis', value: products.value.filter(p => p.stock <= 5).length, icon: 'fas fa-box-open', colorBg: 'bg-red-100', colorText: 'text-red-600', period: 'Alert' }
+                        { label: 'Produk Low Stok', value: products.value.filter(p => p.stock <= 5).length, icon: 'fas fa-exclamation-triangle', colorBg: 'bg-red-100', colorText: 'text-red-600', period: 'Alert' }
                     ];
                 });
 
@@ -574,9 +577,13 @@
                 const filteredTransactions = computed(() => {
                     let res = [...transactions.value].reverse();
                     const now = new Date();
-                    if (trxPeriod.value === 'Minggu Ini') res = res.filter(t => (now - new Date(t.date)) / (1000 * 86400) <= 7);
-                    else if (trxPeriod.value === 'Bulan Ini') res = res.filter(t => new Date(t.date).getMonth() === now.getMonth());
-                    else if (trxPeriod.value === 'Tahun Ini') res = res.filter(t => new Date(t.date).getFullYear() === now.getFullYear());
+                    if (trxPeriod.value === 'Minggu Ini') {
+                        res = res.filter(t => (now - new Date(t.date)) / (1000 * 24 * 3600) <= 7);
+                    } else if (trxPeriod.value === 'Bulan Ini') {
+                        res = res.filter(t => new Date(t.date).getMonth() === now.getMonth());
+                    } else if (trxPeriod.value === 'Tahun Ini') {
+                        res = res.filter(t => new Date(t.date).getFullYear() === now.getFullYear());
+                    }
                     return res;
                 });
 
@@ -594,8 +601,8 @@
                         isLoading.value = false;
                         return data;
                     } catch (e) {
-                        isLoading.value = false;
-                        Swal.fire('Error', 'Gagal Sinkronisasi Cloud.', 'error');
+                        console.error(e); isLoading.value = false;
+                        Swal.fire('Koneksi Gagal', 'Gagal terhubung ke Google Sheet.', 'error');
                         return null;
                     }
                 }
@@ -606,46 +613,32 @@
                         products.value = data.products || [];
                         transactions.value = data.transactions || [];
                         categories.value = data.categories.length ? data.categories : [{id:1, name:'Umum'}, {id:2, name:'Pulsa'}, {id:3, name:'Aksesoris'}];
-                        if (data.settings) Object.assign(settings, data.settings);
+                        if (data.settings) {
+                            const logoTemp = settings.logo;
+                            Object.assign(settings, data.settings);
+                            settings.logo = logoTemp;
+                        }
                         initChart();
                     }
                 }
 
-                function handleLogoUpload(e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.src = event.target.result;
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const max_size = 200;
-                            let w = img.width; let h = img.height;
-                            if (w > h) { if (w > max_size) { h *= max_size / w; w = max_size; } }
-                            else { if (h > max_size) { w *= max_size / h; h = max_size; } }
-                            canvas.width = w; canvas.height = h;
-                            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                            settings.logo = canvas.toDataURL('image/jpeg', 0.8);
-                        };
-                    };
-                    reader.readAsDataURL(file);
-                }
-
                 // --- POS ACTIONS ---
                 function addToCart(p) {
-                    if (p.stock <= 0) return Swal.fire('Habis', 'Stok kosong.', 'warning');
+                    if (p.stock <= 0) return Swal.fire('Habis', 'Stok produk ini kosong.', 'warning');
                     const exists = cart.value.find(i => i.id === p.id);
                     if (exists) {
                         if (exists.qty < p.stock) exists.qty++;
+                        else Swal.fire('Limit', 'Mencapai batas stok.', 'warning');
                     } else { cart.value.push({ ...p, qty: 1 }); }
                 }
+
                 function updateQty(item, d) {
                     const p = products.value.find(x => x.id === item.id);
-                    if (item.qty + d > p.stock) return;
+                    if (item.qty + d > p.stock) return Swal.fire('Stok Kurang', '', 'warning');
                     if (item.qty + d > 0) item.qty += d;
                     else removeFromCart(cart.value.indexOf(item));
                 }
+
                 function removeFromCart(i) { cart.value.splice(i, 1); }
                 function clearCart() { cart.value = []; }
                 function openCheckout() { cashReceived.value = ''; modals.checkout = true; nextTick(() => document.getElementById('cashInput')?.focus()); }
@@ -653,7 +646,7 @@
                 async function processTransaction() {
                     if (cashReceived.value < cartSubtotal.value) return;
                     const trx = {
-                        invoice: 'F2' + Date.now().toString().slice(-6),
+                        invoice: 'F2-' + Date.now(),
                         date: new Date().toISOString().slice(0, 10),
                         time: new Date().toLocaleTimeString('id-ID'),
                         items: JSON.stringify(cart.value.map(i => ({ name: i.name, qty: i.qty, price: i.sellingPrice }))),
@@ -666,8 +659,9 @@
                         const p = products.value.find(x => x.id === i.id);
                         if(p) { p.stock -= i.qty; updated.push(p); }
                     });
+                    transactions.value.push(trx);
                     const res = await callApi('saveTransaction', { ...trx, updatedProducts: updated });
-                    if (res?.success) { transactions.value.push(trx); modals.checkout = false; printReceipt(trx); clearCart(); }
+                    if (res?.success) { modals.checkout = false; printReceipt(trx); clearCart(); Swal.fire({ icon: 'success', title: 'Transaksi Berhasil', timer: 1000, showConfirmButton: false }); }
                 }
 
                 // --- PRODUCT ACTIONS ---
@@ -682,105 +676,93 @@
                     if (res?.success) { modals.product = false; loadData(); }
                 }
                 async function deleteProduct(id) {
-                    const c = await Swal.fire({ title: 'Hapus?', icon: 'warning', showCancelButton: true });
-                    if (c.isConfirmed) { await callApi('deleteProduct', {}, id); loadData(); }
+                    const confirm = await Swal.fire({ title: 'Hapus?', icon: 'warning', showCancelButton: true });
+                    if (confirm.isConfirmed) { await callApi('deleteProduct', {}, id); loadData(); }
                 }
 
-                function saveSettings() {
-                    localStorage.setItem('f2pos_api_url', inputUrl.value);
-                    WEB_APP_URL.value = inputUrl.value;
-                    callApi('saveSettings', settings).then(res => { if(res?.success) Swal.fire('Tersimpan', '', 'success'); });
+                // --- UI UTILS ---
+                function handleLogin() { 
+                    if (loginPin.value === settings.pin) { isLoggedIn.value = true; loadData(); } 
+                    else Swal.fire('PIN Salah', '', 'error');
                 }
-
-                // --- PRINT & RECEIPT ---
-                // PERBAIKAN: Fungsi penanganan data JSON/Objek yang lebih aman
-                function getReceiptHtml(trx) {
-                    let items = [];
-                    try {
-                        // Jika trx.items adalah string, lakukan parse. Jika sudah objek/array, gunakan langsung.
-                        items = (typeof trx.items === 'string') ? JSON.parse(trx.items) : trx.items;
-                    } catch (e) {
-                        console.error("Error parsing items:", e);
-                        items = [];
-                    }
-                    
-                    const logo = settings.logo ? `<img src="${settings.logo}" style="max-width:80px; display:block; margin:0 auto 10px;">` : '';
-                    return `<div style="width:250px; font-family:monospace; padding:10px; font-size:12px; background:white;">
-                        <center>${logo}<b>${settings.storeName}</b><br>${settings.storeAddress}</center><hr>
-                        No: ${trx.invoice}<br>Waktu: ${trx.date} ${trx.time}<hr>
-                        <table style="width:100%">${items.map(i=>`<tr><td>${i.name} x${i.qty}</td><td style="text-align:right">${formatRupiah(i.price*i.qty)}</td></tr>`).join('')}</table><hr>
-                        <table style="width:100%">
-                            <tr><td>Total</td><td style="text-align:right"><b>${formatRupiah(trx.total)}</b></td></tr>
-                            <tr><td>Bayar</td><td style="text-align:right">${formatRupiah(trx.payAmount)}</td></tr>
-                            <tr><td>Kembali</td><td style="text-align:right">${formatRupiah(trx.change)}</td></tr>
-                        </table><hr><center>${settings.receiptFooter}</center></div>`;
-                }
-                function printReceipt(trx) {
-                    const ifr = document.getElementById('receipt-frame');
-                    const doc = ifr.contentWindow.document;
-                    doc.open(); doc.write(`<html><body style="margin:0;">${getReceiptHtml(trx)}</body></html>`); doc.close();
-                    setTimeout(() => { ifr.contentWindow.focus(); ifr.contentWindow.print(); }, 300);
-                }
-                async function saveReceiptImage(trx) {
-                    const container = document.getElementById('receipt-canvas-container');
-                    container.innerHTML = getReceiptHtml(trx);
-                    const canvas = await html2canvas(container, { backgroundColor: '#fff', scale: 2 });
-                    const link = document.createElement('a');
-                    link.download = `Struk_${trx.invoice}.png`;
-                    link.href = canvas.toDataURL();
-                    link.click();
-                }
-
-                // --- TOOLS ---
-                function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n); }
-                function handleLogin() { if (loginPin.value === settings.pin) { isLoggedIn.value = true; loadData(); } else Swal.fire('PIN Salah', '', 'error'); }
                 function handleLogout() { isLoggedIn.value = false; loginPin.value = ''; }
+                function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n); }
                 function resetWebAppUrl() { localStorage.removeItem('f2pos_api_url'); location.reload(); }
-                function copyDbUrl() { navigator.clipboard.writeText(WEB_APP_URL.value); }
+                function copyDbUrl() { navigator.clipboard.writeText(WEB_APP_URL.value); Swal.fire({ icon: 'success', title: 'URL Disalin', timer: 1000, showConfirmButton: false }); }
+                function saveSettings() { localStorage.setItem('f2pos_api_url', inputUrl.value); WEB_APP_URL.value = inputUrl.value; callApi('saveSettings', settings).then(res => { if(res?.success) Swal.fire('Disimpan', '', 'success'); }); }
+
+                function handleLogoUpload(e) {
+                    const file = e.target.files[0];
+                    if(file && file.size < 500000) {
+                        const r = new FileReader();
+                        r.onload = (ev) => { settings.logo = ev.target.result; localStorage.setItem('f2pos_logo', ev.target.result); };
+                        r.readAsDataURL(file);
+                    } else { Swal.fire('Gagal', 'File terlalu besar (Maks 500KB)', 'warning'); }
+                }
 
                 function openScanner() {
                     modals.scanner = true;
                     nextTick(() => {
                         html5QrcodeScanner = new Html5Qrcode("reader");
-                        html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, (text) => {
-                            if (modals.product) productForm.barcode = text;
-                            else { searchQuery.value = text; const p = products.value.find(x=>x.barcode===text); if(p) addToCart(p); }
-                            closeScanner();
+                        html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+                            if (modals.product) { productForm.barcode = text; closeScanner(); }
+                            else { 
+                                searchQuery.value = text; closeScanner(); 
+                                const p = products.value.find(x => x.barcode === text);
+                                if(p) { addToCart(p); searchQuery.value = ''; }
+                            }
                         });
                     });
                 }
                 function closeScanner() { if(html5QrcodeScanner) html5QrcodeScanner.stop().then(() => { html5QrcodeScanner.clear(); modals.scanner = false; }); }
 
+                function printReceipt(trx) {
+                    const iframe = document.getElementById('receipt-frame');
+                    const items = (typeof trx.items === 'string') ? JSON.parse(trx.items) : trx.items;
+                    const logo = settings.logo ? `<img src="${settings.logo}" style="max-width:50%; margin-bottom:10px;">` : '';
+                    const content = `<html><head><style>body{font-family:'Courier New',monospace;font-size:12px;width:58mm;margin:0;padding:5px}table{width:100%}.text-center{text-align:center}.text-right{text-align:right}hr{border-top:1px dashed #000}</style></head>
+                        <body><div class="text-center">${logo}<br><b>${settings.storeName}</b><br>${settings.storeAddress}</div><hr>
+                        <div>No: ${trx.invoice}<br>Tgl: ${trx.date} ${trx.time}</div><hr>
+                        <table>${items.map(i => `<tr><td>${i.name} x${i.qty}</td><td class="text-right">${formatRupiah(i.price * i.qty)}</td></tr>`).join('')}</table><hr>
+                        <table><tr><td>Total</td><td class="text-right"><b>${formatRupiah(trx.total)}</b></td></tr><tr><td>Bayar</td><td class="text-right">${formatRupiah(trx.payAmount)}</td></tr><tr><td>Kembali</td><td class="text-right">${formatRupiah(trx.change)}</td></tr></table><hr>
+                        <div class="text-center">${settings.receiptFooter}</div></body></html>`;
+                    const doc = iframe.contentWindow.document;
+                    doc.open(); doc.write(content); doc.close();
+                    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); }, 500);
+                }
+
                 function initChart() {
                     const ctx = document.getElementById('salesChart');
                     if (!ctx) return;
                     const dates = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
-                    const vals = dates.map(d => transactions.value.filter(t => t.date === d).reduce((s, t) => s + Number(t.total), 0));
+                    const values = dates.map(d => transactions.value.filter(t => t.date === d).reduce((s, t) => s + Number(t.total), 0));
                     if (Chart.getChart("salesChart")) Chart.getChart("salesChart").destroy();
                     new Chart(ctx, {
                         type: 'line',
-                        data: { labels: dates.map(d => d.slice(5)), datasets: [{ data: vals, borderColor: '#4f46e5', tension: 0.4, fill: true, backgroundColor: 'rgba(79, 70, 229, 0.05)' }] },
+                        data: { labels: dates.map(d => d.slice(5)), datasets: [{ label: 'Omset', data: values, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.1)', fill: true, tension: 0.4 }] },
                         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                     });
                 }
 
+                // --- EXCEL ---
                 function downloadTemplate() { 
-                    const ws = XLSX.utils.json_to_sheet([{ barcode: "123", name: "Produk A", category: "Umum", purchasePrice: 1000, sellingPrice: 2000, stock: 10 }]);
+                    const ws = XLSX.utils.json_to_sheet([{ barcode: "123", name: "Contoh", category: "Umum", purchasePrice: 1000, sellingPrice: 2000, stock: 10 }]);
                     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Produk"); XLSX.writeFile(wb, "Template_Produk.xlsx");
                 }
-                function exportProducts() { XLSX.writeFile(XLSX.utils.book_new(), XLSX.utils.json_to_sheet(products.value), "Stok.xlsx"); }
-                function exportTransactions() { XLSX.writeFile(XLSX.utils.book_new(), XLSX.utils.json_to_sheet(filteredTransactions.value), "Laporan.xlsx"); }
-                async function importProducts(e) {
-                    const reader = new FileReader();
-                    reader.onload = async (ev) => {
-                        const data = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(ev.target.result), { type: 'array' }).Sheets["Produk"]);
-                        for(let row of data) await callApi('saveProduct', { id: Date.now()+Math.random(), ...row });
-                        loadData();
-                    };
-                    reader.readAsArrayBuffer(e.target.files[0]);
+                function exportProducts() {
+                    const ws = XLSX.utils.json_to_sheet(products.value);
+                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stok"); XLSX.writeFile(wb, "Data_Stok.xlsx");
+                }
+                function exportTransactions() {
+                    const ws = XLSX.utils.json_to_sheet(filteredTransactions.value);
+                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Laporan"); XLSX.writeFile(wb, "Laporan_Transaksi.xlsx");
                 }
 
-                onMounted(() => { if(isLoggedIn.value) loadData(); });
+                onMounted(() => { 
+                    const savedPin = localStorage.getItem('f2pos_pin');
+                    if(savedPin) settings.pin = savedPin;
+                });
+
                 watch(activeTab, (v) => { if(v === 'dashboard') nextTick(initChart); });
 
                 return {
@@ -790,22 +772,22 @@
                     handleLogin, handleLogout, formatRupiah, resetWebAppUrl, copyDbUrl, saveSettings, handleLogoUpload,
                     addToCart, updateQty, removeFromCart, clearCart, openCheckout, processTransaction,
                     openProductModal, saveProduct, deleteProduct, openScanner, closeScanner, loadData,
-                    printReceipt, saveReceiptImage, downloadTemplate, exportProducts, exportTransactions, importProducts,
+                    printReceipt, downloadTemplate, exportProducts, exportTransactions,
                     menuItems: [
-                        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-th-large' },
+                        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
                         { id: 'pos', label: 'Kasir', icon: 'fas fa-cash-register' },
-                        { id: 'products', label: 'Produk', icon: 'fas fa-layer-group' },
-                        { id: 'transactions', label: 'Riwayat', icon: 'fas fa-clipboard-list' },
-                        { id: 'settings', label: 'Pengaturan', icon: 'fas fa-sliders-h' }
+                        { id: 'products', label: 'Produk', icon: 'fas fa-box' },
+                        { id: 'transactions', label: 'Riwayat', icon: 'fas fa-history' },
+                        { id: 'settings', label: 'Pengaturan', icon: 'fas fa-cog' }
                     ],
                     pageTitle: computed(() => {
-                        if(activeTab.value === 'dashboard') return 'Ikhtisar';
-                        if(activeTab.value === 'pos') return 'Kasir';
-                        if(activeTab.value === 'products') return 'Stok';
-                        if(activeTab.value === 'transactions') return 'Riwayat';
-                        return 'Pengaturan';
+                        if(activeTab.value === 'dashboard') return 'Laporan Dashboard';
+                        if(activeTab.value === 'pos') return 'Mesin Kasir';
+                        if(activeTab.value === 'products') return 'Manajemen Stok';
+                        if(activeTab.value === 'transactions') return 'Riwayat Transaksi';
+                        return 'Pengaturan Aplikasi';
                     }),
-                    currentDate: ref(new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })),
+                    currentDate: ref(new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
                     currentTime: ref(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })),
                     inputUrl
                 };
