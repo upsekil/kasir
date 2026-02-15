@@ -151,7 +151,6 @@
                             <i class="fas fa-bars text-xl"></i>
                         </button>
                         <h2 class="text-xl font-extrabold text-gray-800 tracking-tight">{{ pageTitle }}</h2>
-                        <!-- INDIKATOR OFFLINE -->
                         <span v-if="isOffline" class="bg-red-100 text-red-600 text-[10px] px-2 py-1 rounded-full font-black uppercase ml-2">Offline</span>
                     </div>
                     <div class="flex items-center gap-2 sm:gap-4">
@@ -469,7 +468,7 @@
                         <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Hrg Beli</label><input type="number" v-model="productForm.purchasePrice" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
                         <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Hrg Jual</label><input type="number" v-model="productForm.sellingPrice" class="w-full px-4 py-3 border rounded-xl font-bold text-indigo-600"></div>
                     </div>
-                    <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Stok</label><input type="number" v-model="productForm.stock" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
+                    <div class="space-y-1"><label class="text-[10px] font-black text-gray-400 uppercase">Stok</label><input v-model="productForm.stock" class="w-full px-4 py-3 border rounded-xl font-bold"></div>
                 </div>
                 <div class="flex gap-3 mt-8">
                     <button @click="modals.product = false" class="flex-1 py-4 border-2 rounded-2xl font-bold text-gray-400 uppercase">Batal</button>
@@ -505,7 +504,6 @@
                 const isLoggedIn = ref(false);
                 const loginPin = ref('');
                 
-                // Event Listeners untuk koneksi
                 window.addEventListener('online', () => isOffline.value = false);
                 window.addEventListener('offline', () => isOffline.value = true);
 
@@ -695,10 +693,19 @@
                 }
 
                 // --- PRINT & RECEIPT ---
+                // PERBAIKAN: Fungsi penanganan data JSON/Objek yang lebih aman
                 function getReceiptHtml(trx) {
-                    const items = JSON.parse(trx.items);
+                    let items = [];
+                    try {
+                        // Jika trx.items adalah string, lakukan parse. Jika sudah objek/array, gunakan langsung.
+                        items = (typeof trx.items === 'string') ? JSON.parse(trx.items) : trx.items;
+                    } catch (e) {
+                        console.error("Error parsing items:", e);
+                        items = [];
+                    }
+                    
                     const logo = settings.logo ? `<img src="${settings.logo}" style="max-width:80px; display:block; margin:0 auto 10px;">` : '';
-                    return `<div style="width:250px; font-family:monospace; padding:10px; font-size:12px;">
+                    return `<div style="width:250px; font-family:monospace; padding:10px; font-size:12px; background:white;">
                         <center>${logo}<b>${settings.storeName}</b><br>${settings.storeAddress}</center><hr>
                         No: ${trx.invoice}<br>Waktu: ${trx.date} ${trx.time}<hr>
                         <table style="width:100%">${items.map(i=>`<tr><td>${i.name} x${i.qty}</td><td style="text-align:right">${formatRupiah(i.price*i.qty)}</td></tr>`).join('')}</table><hr>
@@ -711,13 +718,13 @@
                 function printReceipt(trx) {
                     const ifr = document.getElementById('receipt-frame');
                     const doc = ifr.contentWindow.document;
-                    doc.open(); doc.write(getReceiptHtml(trx)); doc.close();
+                    doc.open(); doc.write(`<html><body style="margin:0;">${getReceiptHtml(trx)}</body></html>`); doc.close();
                     setTimeout(() => { ifr.contentWindow.focus(); ifr.contentWindow.print(); }, 300);
                 }
                 async function saveReceiptImage(trx) {
                     const container = document.getElementById('receipt-canvas-container');
                     container.innerHTML = getReceiptHtml(trx);
-                    const canvas = await html2canvas(container, { backgroundColor: '#fff' });
+                    const canvas = await html2canvas(container, { backgroundColor: '#fff', scale: 2 });
                     const link = document.createElement('a');
                     link.download = `Struk_${trx.invoice}.png`;
                     link.href = canvas.toDataURL();
@@ -726,7 +733,7 @@
 
                 // --- TOOLS ---
                 function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n); }
-                function handleLogin() { if (loginPin.value === settings.pin) { isLoggedIn.value = true; loadData(); } else Swal.fire('Salah', '', 'error'); }
+                function handleLogin() { if (loginPin.value === settings.pin) { isLoggedIn.value = true; loadData(); } else Swal.fire('PIN Salah', '', 'error'); }
                 function handleLogout() { isLoggedIn.value = false; loginPin.value = ''; }
                 function resetWebAppUrl() { localStorage.removeItem('f2pos_api_url'); location.reload(); }
                 function copyDbUrl() { navigator.clipboard.writeText(WEB_APP_URL.value); }
