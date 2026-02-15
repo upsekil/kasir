@@ -41,6 +41,9 @@
 <body>
     <div id="app" class="h-screen flex flex-col overflow-hidden">
         
+        <!-- HIDDEN IFRAME FOR PRINTING (SOLUSI POPUP BLOCKER) -->
+        <iframe id="receipt-frame" class="fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-none"></iframe>
+
         <!-- Loading Indicator -->
         <div v-if="isLoading" class="loading-overlay">
             <div class="spinner mb-4"></div>
@@ -1086,42 +1089,70 @@
                     } else { modals.scanner = false; }
                 }
                 
-                // --- PRINT ---
+                // --- PRINT (UPDATED: USE IFRAME TO AVOID POPUP BLOCKER) ---
                 function printReceipt(trx) {
-                    const win = window.open('', '', 'width=300,height=600');
+                    const iframe = document.getElementById('receipt-frame');
+                    const doc = iframe.contentWindow.document;
+                    
                     const itemsHtml = (typeof trx.items === 'string' ? JSON.parse(trx.items) : trx.items).map(i => 
-                        `<tr><td style="text-align:left">${i.name} x${i.qty}</td><td style="text-align:right">${formatRupiah(i.price * i.qty)}</td></tr>`
+                        `<tr>
+                            <td style="padding: 2px 0;">${i.name} <br> <span style="font-size:10px; color:#666;">${i.qty} x ${formatRupiah(i.price)}</span></td>
+                            <td style="text-align:right; vertical-align:top; padding: 2px 0;">${formatRupiah(i.price * i.qty)}</td>
+                        </tr>`
                     ).join('');
                     
-                    // Logo Handling
-                    const logoHtml = settings.logo ? `<img src="${settings.logo}" style="max-width:80px; margin-bottom:10px;"><br>` : '';
+                    const logoHtml = settings.logo ? `<img src="${settings.logo}" style="max-width:60%; margin-bottom:10px; display:block; margin-left:auto; margin-right:auto;">` : '';
 
-                    win.document.write(`
-                        <html><head><style>body{font-family:'Courier New',monospace;font-size:12px;width:58mm;margin:0 auto;padding:10px}table{width:100%}hr{border-top:1px dashed #000}</style></head>
+                    const content = `
+                        <html>
+                        <head>
+                            <style>
+                                body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; width: 58mm; }
+                                table { width: 100%; border-collapse: collapse; }
+                                td { vertical-align: top; }
+                                hr { border-top: 1px dashed #000; border-bottom: none; margin: 10px 0; }
+                                .text-center { text-align: center; }
+                                .text-right { text-align: right; }
+                                .bold { font-weight: bold; }
+                                .small { font-size: 10px; }
+                            </style>
+                        </head>
                         <body>
-                            <center>
+                            <div class="text-center">
                                 ${logoHtml}
-                                <b>${settings.storeName}</b><br>${settings.storeAddress}
-                            </center>
+                                <div class="bold" style="font-size:14px">${settings.storeName}</div>
+                                <div class="small">${settings.storeAddress}</div>
+                            </div>
                             <hr>
-                            Date: ${trx.date} ${trx.time}<br>
-                            Inv: ${trx.invoice}
+                            <div>No: ${trx.invoice}</div>
+                            <div>Tgl: ${trx.date} ${trx.time}</div>
                             <hr>
                             <table>${itemsHtml}</table>
                             <hr>
                             <table>
-                                <tr><td>Total</td><td align="right"><b>${formatRupiah(trx.total)}</b></td></tr>
-                                <tr><td>Bayar</td><td align="right">${formatRupiah(trx.payAmount)}</td></tr>
-                                <tr><td>Kembali</td><td align="right">${formatRupiah(trx.change)}</td></tr>
+                                <tr><td>Total</td><td class="text-right bold">${formatRupiah(trx.total)}</td></tr>
+                                <tr><td>Bayar</td><td class="text-right">${formatRupiah(trx.payAmount)}</td></tr>
+                                <tr><td>Kembali</td><td class="text-right">${formatRupiah(trx.change)}</td></tr>
                             </table>
                             <hr>
-                            <center>${settings.receiptFooter}</center>
-                        </body></html>
-                    `);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    win.close();
+                            <div class="text-center small">
+                                ${settings.receiptFooter}<br>
+                                <br>
+                                -- Simpan Struk Ini --
+                            </div>
+                        </body>
+                        </html>
+                    `;
+                    
+                    doc.open();
+                    doc.write(content);
+                    doc.close();
+                    
+                    // Tunggu sebentar agar style/gambar terload sebelum print
+                    setTimeout(() => {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                    }, 500);
                 }
                 
                 // --- CHART ---
