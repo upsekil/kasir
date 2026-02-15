@@ -36,12 +36,18 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        @keyframes slide-in {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+        .animate-slide-in { animation: slide-in 0.3s ease-out; }
     </style>
 </head>
 <body>
     <div id="app" class="h-screen flex flex-col overflow-hidden">
         
-        <!-- HIDDEN IFRAME FOR PRINTING (SOLUSI POPUP BLOCKER) -->
+        <!-- HIDDEN IFRAME FOR PRINTING -->
         <iframe id="receipt-frame" class="fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-none"></iframe>
 
         <!-- Loading Indicator -->
@@ -72,7 +78,6 @@
                         class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold shadow-lg shadow-indigo-200 transition-all transform active:scale-95">
                         Masuk Aplikasi
                     </button>
-                    <!-- Tombol Reset URL Web App -->
                     <div class="text-center mt-4">
                         <button type="button" @click="resetWebAppUrl" class="text-xs text-gray-400 hover:text-indigo-500 underline">
                             Reset Database URL
@@ -85,12 +90,9 @@
         <!-- MAIN APP -->
         <div v-else class="flex h-full relative">
             
-            <!-- MOBILE MENU OVERLAY (DRAWER) - PERBAIKAN UTAMA -->
+            <!-- MOBILE MENU OVERLAY (DRAWER) -->
             <div v-if="mobileMenuOpen" class="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true">
-                <!-- Backdrop -->
                 <div class="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity" @click="mobileMenuOpen = false"></div>
-                
-                <!-- Sidebar Panel -->
                 <div class="fixed inset-y-0 left-0 flex flex-col w-64 bg-white shadow-xl z-50 transform transition-transform animate-slide-in">
                     <div class="p-4 flex items-center justify-between border-b border-gray-100 h-16">
                         <div class="flex items-center gap-3">
@@ -103,7 +105,6 @@
                             <i class="fas fa-times text-xl"></i>
                         </button>
                     </div>
-                    
                     <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
                         <template v-for="item in menuItems" :key="item.id">
                             <button @click="activeTab = item.id; mobileMenuOpen = false" 
@@ -114,7 +115,6 @@
                             </button>
                         </template>
                     </nav>
-
                     <div class="p-4 border-t border-gray-100">
                         <button @click="handleLogout" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all">
                             <i class="fas fa-sign-out-alt text-lg w-6"></i>
@@ -137,7 +137,6 @@
                         <i class="fas" :class="sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
                     </button>
                 </div>
-
                 <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
                     <template v-for="item in menuItems" :key="item.id">
                         <button @click="activeTab = item.id" 
@@ -148,7 +147,6 @@
                         </button>
                     </template>
                 </nav>
-
                 <div class="p-4 border-t border-gray-100">
                     <button @click="handleLogout" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all">
                         <i class="fas fa-sign-out-alt text-lg w-6"></i>
@@ -160,28 +158,22 @@
             <!-- CONTENT AREA -->
             <main class="flex-1 flex flex-col relative min-w-0 bg-gray-50/50">
                 
-                <!-- HEADER (Mobile & Desktop) -->
+                <!-- HEADER -->
                 <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-10 sticky top-0">
                     <div class="flex items-center gap-4">
                         <button @click="mobileMenuOpen = true" class="md:hidden p-2 -ml-2 text-gray-600 focus:outline-none rounded-lg hover:bg-gray-100">
                             <i class="fas fa-bars text-xl"></i>
                         </button>
                         <h2 class="text-xl font-bold text-gray-800 hidden sm:block">{{ pageTitle }}</h2>
-                        <span v-if="isOffline" class="bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full font-bold">OFFLINE MODE</span>
                     </div>
-
                     <div class="flex items-center gap-3">
-                         <!-- Refresh Button -->
-                        <button @click="loadData" class="p-2 rounded-full hover:bg-gray-100 text-gray-500" title="Sync Data">
+                        <button @click="loadData" class="p-2 rounded-full hover:bg-gray-100 text-gray-500" title="Sinkron Data">
                             <i class="fas fa-sync-alt" :class="{'fa-spin': isLoading}"></i>
                         </button>
-                        
                         <div class="text-right hidden sm:block mr-2">
                             <div class="text-xs text-gray-500">{{ currentDate }}</div>
                             <div class="text-sm font-bold text-indigo-600">{{ currentTime }}</div>
                         </div>
-                        
-                        <!-- Cart Trigger (Mobile) -->
                         <button v-if="activeTab === 'pos'" @click="showMobileCart = !showMobileCart" class="relative p-2 md:hidden text-indigo-600">
                             <i class="fas fa-shopping-cart text-xl"></i>
                             <span v-if="cartTotalQty > 0" class="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
@@ -196,22 +188,45 @@
                     
                     <!-- 1. DASHBOARD -->
                     <div v-if="activeTab === 'dashboard'" class="space-y-6">
+                        <!-- Stat Cards Grid -->
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div v-for="(stat, index) in dashboardStats" :key="index" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                            <div v-for="(stat, index) in dashboardStats" :key="index" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 transition-transform hover:scale-[1.02]">
                                 <div class="flex justify-between items-start mb-2">
                                     <div :class="`p-2 rounded-lg ${stat.colorBg} ${stat.colorText}`">
                                         <i :class="stat.icon"></i>
                                     </div>
-                                    <span class="text-xs font-medium text-gray-400">Hari Ini</span>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">{{ stat.period }}</span>
                                 </div>
-                                <h3 class="text-2xl font-bold text-gray-800">{{ stat.value }}</h3>
-                                <p class="text-sm text-gray-500">{{ stat.label }}</p>
+                                <h3 class="text-xl md:text-2xl font-bold text-gray-800">{{ stat.value }}</h3>
+                                <p class="text-xs text-gray-500">{{ stat.label }}</p>
                             </div>
                         </div>
 
+                        <!-- Laporan Mingguan, Bulanan, Tahunan Summary -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                             <div class="bg-indigo-600 p-5 rounded-2xl shadow-lg text-white">
+                                <div class="text-sm opacity-80 mb-1">Omset Minggu Ini</div>
+                                <div class="text-2xl font-bold">{{ formatRupiah(statSummary.weekly) }}</div>
+                                <div class="text-xs mt-2 opacity-70">{{ statSummary.weeklyCount }} Transaksi</div>
+                             </div>
+                             <div class="bg-emerald-600 p-5 rounded-2xl shadow-lg text-white">
+                                <div class="text-sm opacity-80 mb-1">Omset Bulan Ini</div>
+                                <div class="text-2xl font-bold">{{ formatRupiah(statSummary.monthly) }}</div>
+                                <div class="text-xs mt-2 opacity-70">{{ statSummary.monthlyCount }} Transaksi</div>
+                             </div>
+                             <div class="bg-orange-600 p-5 rounded-2xl shadow-lg text-white">
+                                <div class="text-sm opacity-80 mb-1">Omset Tahun Ini</div>
+                                <div class="text-2xl font-bold">{{ formatRupiah(statSummary.yearly) }}</div>
+                                <div class="text-xs mt-2 opacity-70">{{ statSummary.yearlyCount }} Transaksi</div>
+                             </div>
+                        </div>
+
                         <!-- Chart Area -->
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-80">
-                            <h3 class="font-bold text-gray-700 mb-4">Grafik Penjualan (7 Hari Terakhir)</h3>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-gray-700">Grafik Penjualan (7 Hari Terakhir)</h3>
+                                <button @click="loadData" class="text-xs text-indigo-600 hover:underline">Perbarui Data</button>
+                            </div>
                             <div class="h-64">
                                 <canvas id="salesChart"></canvas>
                             </div>
@@ -220,111 +235,70 @@
 
                     <!-- 2. POS (Point of Sale) -->
                     <div v-if="activeTab === 'pos'" class="h-full flex flex-col md:flex-row gap-6">
-                        <!-- Product Grid -->
                         <div class="flex-1 flex flex-col h-full overflow-hidden">
-                            <!-- Search & Filter -->
+                            <!-- Search & Category -->
                             <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-4 space-y-3">
                                 <div class="relative">
                                     <i class="fas fa-search absolute left-4 top-3.5 text-gray-400"></i>
-                                    <input v-model="searchQuery" @keyup="handleKeyup" id="searchInput"
-                                        class="w-full pl-11 pr-12 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500" 
-                                        placeholder="Cari produk (Nama / Barcode)...">
+                                    <input v-model="searchQuery" class="w-full pl-11 pr-12 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500" placeholder="Cari nama produk atau scan barcode...">
                                     <button @click="openScanner" class="absolute right-3 top-2.5 p-1 text-gray-500 hover:text-indigo-600">
                                         <i class="fas fa-barcode text-xl"></i>
                                     </button>
                                 </div>
                                 <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-                                    <button @click="activeCategory = 'all'" 
-                                        :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors', 
-                                        activeCategory === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']">
-                                        Semua
-                                    </button>
-                                    <button v-for="cat in categories" :key="cat.id" @click="activeCategory = cat.name"
-                                        :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors', 
-                                        activeCategory === cat.name ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']">
-                                        {{ cat.name }}
-                                    </button>
+                                    <button @click="activeCategory = 'all'" :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors', activeCategory === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']">Semua</button>
+                                    <button v-for="cat in categories" :key="cat.id" @click="activeCategory = cat.name" :class="['px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors', activeCategory === cat.name ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200']">{{ cat.name }}</button>
                                 </div>
                             </div>
-
-                            <!-- Products -->
+                            <!-- Product Grid -->
                             <div class="flex-1 overflow-y-auto">
-                                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-20 md:pb-0">
-                                    <div v-for="product in filteredProducts" :key="product.id" @click="addToCart(product)"
-                                        class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group relative overflow-hidden">
-                                        <div class="absolute top-2 right-2 bg-gray-900/5 text-xs font-bold px-2 py-1 rounded-md text-gray-600">
-                                            Stok: {{ product.stock }}
-                                        </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-20 md:pb-4">
+                                    <div v-for="product in filteredProducts" :key="product.id" @click="addToCart(product)" class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
                                         <div class="h-24 flex items-center justify-center text-4xl mb-2 text-gray-200 group-hover:scale-110 transition-transform">
                                             <i class="fas fa-box"></i>
                                         </div>
                                         <h4 class="font-semibold text-gray-800 text-sm line-clamp-2 min-h-[2.5em]">{{ product.name }}</h4>
-                                        <p class="text-indigo-600 font-bold mt-1">{{ formatRupiah(product.sellingPrice) }}</p>
-                                    </div>
-                                    <div v-if="filteredProducts.length === 0" class="col-span-full text-center py-10 text-gray-400">
-                                        <i class="fas fa-box-open text-4xl mb-3"></i>
-                                        <p>Produk tidak ditemukan</p>
+                                        <div class="flex justify-between items-center mt-2">
+                                            <span class="text-indigo-600 font-bold text-sm">{{ formatRupiah(product.sellingPrice) }}</span>
+                                            <span :class="['text-[10px] font-bold px-1.5 py-0.5 rounded', product.stock <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600']">Stok: {{ product.stock }}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Cart Sidebar (Desktop & Mobile Drawer) -->
-                        <div :class="['fixed md:static inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl md:shadow-none md:border-l border-gray-200 z-30 transform transition-transform duration-300 flex flex-col', 
-                            showMobileCart ? 'translate-x-0' : 'translate-x-full md:translate-x-0']">
-                            
+                        <!-- Cart Sidebar -->
+                        <div :class="['fixed md:static inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl md:shadow-none md:border-l border-gray-200 z-30 transform transition-transform duration-300 flex flex-col', showMobileCart ? 'translate-x-0' : 'translate-x-full md:translate-x-0']">
                             <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                                 <h3 class="font-bold text-lg text-gray-800">Keranjang</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full font-bold">{{ cartTotalQty }} Item</span>
-                                    <button @click="showMobileCart = false" class="md:hidden p-2 text-gray-500">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
+                                <button @click="showMobileCart = false" class="md:hidden p-2 text-gray-500"><i class="fas fa-times"></i></button>
                             </div>
-
                             <div class="flex-1 overflow-y-auto p-4 space-y-4">
-                                <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-                                    <i class="fas fa-shopping-basket text-6xl opacity-20"></i>
-                                    <p class="text-sm">Keranjang masih kosong</p>
+                                <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-gray-300">
+                                    <i class="fas fa-shopping-basket text-6xl mb-4 opacity-20"></i>
+                                    <p>Keranjang kosong</p>
                                 </div>
-                                <template v-else>
-                                    <div v-for="(item, index) in cart" :key="index" class="flex gap-3 relative group">
-                                        <div class="w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center shrink-0">
-                                            <i class="fas fa-box text-gray-300"></i>
+                                <div v-for="(item, index) in cart" :key="index" class="flex gap-3 relative group bg-gray-50 p-3 rounded-xl">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-gray-800 text-sm line-clamp-1">{{ item.name }}</h4>
+                                        <p class="text-xs text-indigo-600 font-bold mb-2">{{ formatRupiah(item.sellingPrice) }}</p>
+                                        <div class="flex items-center gap-3">
+                                            <button @click="updateQty(item, -1)" class="w-6 h-6 rounded bg-white border flex items-center justify-center text-xs">-</button>
+                                            <span class="text-sm font-bold">{{ item.qty }}</span>
+                                            <button @click="updateQty(item, 1)" class="w-6 h-6 rounded bg-indigo-600 text-white flex items-center justify-center text-xs">+</button>
                                         </div>
-                                        <div class="flex-1">
-                                            <h4 class="font-medium text-gray-800 text-sm line-clamp-1">{{ item.name }}</h4>
-                                            <p class="text-xs text-indigo-600 font-bold mb-2">{{ formatRupiah(item.sellingPrice) }}</p>
-                                            <div class="flex items-center gap-3">
-                                                <button @click="updateQty(item, -1)" class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xs">-</button>
-                                                <span class="text-sm font-bold w-4 text-center">{{ item.qty }}</span>
-                                                <button @click="updateQty(item, 1)" class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 hover:bg-indigo-200 flex items-center justify-center text-xs">+</button>
-                                            </div>
-                                        </div>
-                                        <button @click="removeFromCart(index)" class="absolute top-0 right-0 text-gray-300 hover:text-red-500 p-1">
-                                            <i class="fas fa-trash-alt text-xs"></i>
-                                        </button>
                                     </div>
-                                </template>
-                            </div>
-
-                            <div class="p-4 bg-gray-50 border-t border-gray-200">
-                                <div class="flex justify-between mb-2 text-sm">
-                                    <span class="text-gray-500">Subtotal</span>
-                                    <span class="font-bold text-gray-800">{{ formatRupiah(cartSubtotal) }}</span>
+                                    <button @click="removeFromCart(index)" class="text-red-400 hover:text-red-600"><i class="fas fa-trash-alt"></i></button>
                                 </div>
+                            </div>
+                            <div class="p-4 bg-gray-50 border-t">
                                 <div class="flex justify-between mb-4 text-xl font-bold">
-                                    <span class="text-gray-800">Total</span>
+                                    <span>Total</span>
                                     <span class="text-indigo-600">{{ formatRupiah(cartSubtotal) }}</span>
                                 </div>
                                 <div class="grid grid-cols-2 gap-3">
-                                    <button @click="clearCart" :disabled="cart.length === 0" class="py-3 rounded-xl border border-red-200 text-red-500 font-medium hover:bg-red-50 disabled:opacity-50 text-sm">
-                                        Hapus
-                                    </button>
-                                    <button @click="openCheckout" :disabled="cart.length === 0" class="py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:shadow-none text-sm">
-                                        Bayar
-                                    </button>
+                                    <button @click="clearCart" :disabled="cart.length === 0" class="py-3 rounded-xl border font-medium hover:bg-red-50 text-red-500 disabled:opacity-30">Batal</button>
+                                    <button @click="openCheckout" :disabled="cart.length === 0" class="py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50">Bayar</button>
                                 </div>
                             </div>
                         </div>
@@ -332,166 +306,117 @@
 
                     <!-- 3. PRODUCTS MANAGEMENT -->
                     <div v-if="activeTab === 'products'" class="space-y-4">
-                        <!-- Toolbar Import/Export/Add -->
                         <div class="flex flex-col md:flex-row justify-between items-center gap-3">
                             <div class="relative max-w-xs w-full">
                                 <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
-                                <input v-model="searchQuery" class="w-full pl-9 pr-4 py-2 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Cari produk...">
+                                <input v-model="searchQuery" class="w-full pl-9 pr-4 py-2 rounded-xl border shadow-sm focus:ring-indigo-500 text-sm" placeholder="Cari produk...">
                             </div>
                             <div class="flex gap-2 w-full md:w-auto overflow-x-auto hide-scrollbar">
-                                <button @click="downloadTemplate" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200 whitespace-nowrap" title="Template Excel">
-                                    <i class="fas fa-file-download mr-1"></i> Template
-                                </button>
-                                <button @click="$refs.fileInput.click()" class="bg-green-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-green-700 whitespace-nowrap" title="Upload Excel">
-                                    <i class="fas fa-file-upload mr-1"></i> Import
-                                </button>
-                                <input type="file" ref="fileInput" class="hidden" accept=".xlsx, .xls" @change="importProducts">
-                                
-                                <button @click="exportProducts" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 whitespace-nowrap" title="Download Data">
-                                    <i class="fas fa-file-export mr-1"></i> Export
-                                </button>
-                                <button @click="openProductModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 whitespace-nowrap">
-                                    <i class="fas fa-plus mr-1"></i> Tambah
-                                </button>
+                                <button @click="downloadTemplate" class="bg-gray-100 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap"><i class="fas fa-file-download mr-1"></i> Template</button>
+                                <button @click="$refs.fileInput.click()" class="bg-green-600 text-white px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap"><i class="fas fa-file-upload mr-1"></i> Import</button>
+                                <input type="file" ref="fileInput" class="hidden" @change="importProducts">
+                                <button @click="exportProducts" class="bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold"><i class="fas fa-file-export mr-1"></i> Export</button>
+                                <button @click="openProductModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">Tambah</button>
                             </div>
                         </div>
-
-                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left text-sm">
-                                    <thead class="bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-6 py-4 font-semibold text-gray-600">Nama Produk</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600">Kategori</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600 text-right">Harga Beli</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600 text-right">Harga Jual</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600 text-center">Stok</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600 text-center">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100">
-                                        <tr v-for="product in filteredProducts" :key="product.id" class="hover:bg-gray-50 transition-colors">
-                                            <td class="px-6 py-4 font-medium text-gray-800">{{ product.name }}<br><span class="text-xs text-gray-400">{{product.barcode}}</span></td>
-                                            <td class="px-6 py-4 text-gray-500"><span class="bg-gray-100 px-2 py-1 rounded text-xs">{{ product.category }}</span></td>
-                                            <td class="px-6 py-4 text-right text-gray-600">{{ formatRupiah(product.purchasePrice) }}</td>
-                                            <td class="px-6 py-4 text-right text-indigo-600 font-bold">{{ formatRupiah(product.sellingPrice) }}</td>
-                                            <td class="px-6 py-4 text-center">
-                                                <span :class="['px-2 py-1 rounded-full text-xs font-bold', product.stock <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600']">
-                                                    {{ product.stock }}
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-4 text-center">
-                                                <div class="flex justify-center gap-2">
-                                                    <button @click="openProductModal(product)" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><i class="fas fa-edit"></i></button>
-                                                    <button @click="deleteProduct(product.id)" class="p-2 text-red-500 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 border-b">
+                                    <tr>
+                                        <th class="px-6 py-4">Produk</th>
+                                        <th class="px-6 py-4">Kategori</th>
+                                        <th class="px-6 py-4 text-right">Harga Jual</th>
+                                        <th class="px-6 py-4 text-center">Stok</th>
+                                        <th class="px-6 py-4 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y">
+                                    <tr v-for="product in filteredProducts" :key="product.id" class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 font-medium">{{ product.name }}<br><span class="text-xs text-gray-400">{{product.barcode}}</span></td>
+                                        <td class="px-6 py-4"><span class="bg-gray-100 px-2 py-1 rounded text-xs">{{ product.category }}</span></td>
+                                        <td class="px-6 py-4 text-right font-bold">{{ formatRupiah(product.sellingPrice) }}</td>
+                                        <td class="px-6 py-4 text-center">
+                                            <span :class="['px-2 py-1 rounded-full text-[10px] font-bold', product.stock <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600']">{{ product.stock }}</span>
+                                        </td>
+                                        <td class="px-6 py-4 text-center">
+                                            <button @click="openProductModal(product)" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg mr-1"><i class="fas fa-edit"></i></button>
+                                            <button @click="deleteProduct(product.id)" class="p-2 text-red-500 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
                      <!-- 4. TRANSACTIONS -->
                      <div v-if="activeTab === 'transactions'" class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-bold text-gray-700">Riwayat Transaksi</h3>
-                            <button @click="exportTransactions" class="text-green-600 hover:bg-green-50 px-3 py-2 rounded-lg text-sm font-medium">
-                                <i class="fas fa-file-excel mr-2"></i> Export Excel
-                            </button>
-                        </div>
-                        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left text-sm">
-                                    <thead class="bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th class="px-6 py-4 font-semibold text-gray-600">Invoice</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600">Tanggal</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600">Total</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600 text-center">Metode</th>
-                                            <th class="px-6 py-4 font-semibold text-gray-600 text-center">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100">
-                                        <tr v-for="trx in transactions.slice().reverse()" :key="trx.invoice" class="hover:bg-gray-50">
-                                            <td class="px-6 py-4 font-mono text-gray-600 text-xs">{{ trx.invoice }}</td>
-                                            <td class="px-6 py-4 text-gray-600">
-                                                <div class="font-medium">{{ trx.date }}</div>
-                                                <div class="text-xs text-gray-400">{{ trx.time }}</div>
-                                            </td>
-                                            <td class="px-6 py-4 font-bold text-gray-800">{{ formatRupiah(trx.total) }}</td>
-                                            <td class="px-6 py-4 text-center">
-                                                <span class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 uppercase">{{ trx.paymentMethod || 'CASH' }}</span>
-                                            </td>
-                                            <td class="px-6 py-4 text-center">
-                                                 <button @click="printReceipt(trx)" class="p-2 text-gray-500 hover:text-indigo-600">
-                                                    <i class="fas fa-print"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+                            <div class="flex gap-2">
+                                <button v-for="p in ['Semua', 'Minggu Ini', 'Bulan Ini', 'Tahun Ini']" 
+                                    @click="trxPeriod = p"
+                                    :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition-all', trxPeriod === p ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border']">
+                                    {{ p }}
+                                </button>
                             </div>
+                            <button @click="exportTransactions" class="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold"><i class="fas fa-file-excel mr-2"></i>Export Laporan</button>
+                        </div>
+                        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-50 border-b">
+                                    <tr>
+                                        <th class="px-6 py-4">Invoice</th>
+                                        <th class="px-6 py-4">Waktu</th>
+                                        <th class="px-6 py-4 text-right">Total</th>
+                                        <th class="px-6 py-4 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y">
+                                    <tr v-for="trx in filteredTransactions" :key="trx.invoice" class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 font-mono text-xs uppercase">{{ trx.invoice }}</td>
+                                        <td class="px-6 py-4 text-gray-600">
+                                            <div class="font-medium text-xs">{{ trx.date }}</div>
+                                            <div class="text-[10px] opacity-60">{{ trx.time }}</div>
+                                        </td>
+                                        <td class="px-6 py-4 text-right font-bold text-indigo-600">{{ formatRupiah(trx.total) }}</td>
+                                        <td class="px-6 py-4 text-center">
+                                             <button @click="printReceipt(trx)" class="p-2 text-gray-400 hover:text-indigo-600"><i class="fas fa-print"></i></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
                     <!-- 5. SETTINGS -->
-                    <div v-if="activeTab === 'settings'" class="max-w-2xl mx-auto space-y-6">
-                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                            <h3 class="font-bold text-lg text-gray-800 mb-4 border-b pb-2">Pengaturan Toko</h3>
+                    <div v-if="activeTab === 'settings'" class="max-w-2xl mx-auto space-y-6 pb-10">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border">
+                            <h3 class="font-bold text-lg mb-4 border-b pb-2">Pengaturan Toko</h3>
                             <div class="space-y-4">
-                                <!-- Logo Upload Section -->
                                 <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
-                                    <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-200">
+                                    <div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden border">
                                         <img v-if="settings.logo" :src="settings.logo" class="w-full h-full object-contain">
                                         <i v-else class="fas fa-image text-gray-300 text-2xl"></i>
                                     </div>
                                     <div class="flex-1">
-                                        <h4 class="text-sm font-medium text-gray-700">Logo Struk</h4>
-                                        <p class="text-xs text-gray-500 mb-2">Format: PNG/JPG. Max: 500KB. (Disimpan di browser)</p>
-                                        <div class="flex gap-2">
-                                            <button @click="$refs.logoInput.click()" class="px-3 py-1 bg-white border border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50">Upload Logo</button>
-                                            <button v-if="settings.logo" @click="settings.logo = ''" class="px-3 py-1 text-red-500 text-xs font-medium hover:text-red-600">Hapus</button>
+                                        <h4 class="text-sm font-medium">Logo Struk</h4>
+                                        <div class="flex gap-2 mt-2">
+                                            <button @click="$refs.logoInput.click()" class="px-3 py-1 bg-white border rounded-lg text-xs font-medium">Upload</button>
+                                            <button v-if="settings.logo" @click="settings.logo = ''" class="px-3 py-1 text-red-500 text-xs">Hapus</button>
                                         </div>
                                         <input type="file" ref="logoInput" class="hidden" accept="image/*" @change="handleLogoUpload">
                                     </div>
                                 </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Toko</label>
-                                    <input v-model="settings.storeName" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-indigo-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
-                                    <textarea v-model="settings.storeAddress" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-indigo-500" rows="2"></textarea>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Footer Struk</label>
-                                    <input v-model="settings.receiptFooter" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-indigo-500">
-                                </div>
-                                
+                                <div><label class="block text-xs font-bold text-gray-500 mb-1">Nama Toko</label><input v-model="settings.storeName" class="w-full px-4 py-2 border rounded-xl"></div>
+                                <div><label class="block text-xs font-bold text-gray-500 mb-1">Alamat</label><textarea v-model="settings.storeAddress" class="w-full px-4 py-2 border rounded-xl" rows="2"></textarea></div>
+                                <div><label class="block text-xs font-bold text-gray-500 mb-1">Footer Struk</label><input v-model="settings.receiptFooter" class="w-full px-4 py-2 border rounded-xl"></div>
                                 <div class="pt-4 border-t mt-4">
-                                     <label class="block text-sm font-medium text-indigo-700 mb-1">URL Google Web App (Database)</label>
-                                     <div class="flex gap-2 mb-2">
-                                        <input v-model="inputUrl" 
-                                            class="flex-1 px-4 py-2 border rounded-xl focus:ring-2 focus:ring-indigo-500 font-mono text-xs text-gray-600 truncate" 
-                                            placeholder="https://script.google.com/macros/s/.../exec">
-                                        <button @click="copyDbUrl" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl" title="Salin URL">
-                                            <i class="fas fa-copy"></i>
-                                        </button>
-                                        <button @click="shareDbUrl" v-if="canShare" class="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-600 rounded-xl" title="Bagikan">
-                                            <i class="fas fa-share-alt"></i>
-                                        </button>
+                                     <label class="block text-xs font-bold text-indigo-500 mb-1">URL Google Database</label>
+                                     <div class="flex gap-2">
+                                        <input v-model="inputUrl" class="flex-1 px-4 py-2 border rounded-xl font-mono text-xs truncate" placeholder="https://script.google.com/...">
+                                        <button @click="copyDbUrl" class="px-4 py-2 bg-gray-100 rounded-xl"><i class="fas fa-copy"></i></button>
                                      </div>
-                                     <p class="text-xs text-gray-500">
-                                         <i class="fas fa-info-circle"></i> URL ini digunakan untuk menghubungkan aplikasi lain (HP/Tablet) ke database yang sama.
-                                     </p>
                                 </div>
-
-                                <div class="pt-4">
-                                    <button @click="saveSettings" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700">Simpan Pengaturan</button>
-                                </div>
+                                <button @click="saveSettings" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mt-4">Simpan Pengaturan</button>
                             </div>
                         </div>
                     </div>
@@ -500,98 +425,61 @@
             </main>
         </div>
 
-        <!-- MODALS -->
-        <!-- 1. Checkout Modal -->
+        <!-- MODAL CHECKOUT -->
         <div v-if="modals.checkout" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4 sm:p-0 backdrop-blur-sm">
-            <div class="bg-white w-full sm:w-[480px] rounded-t-2xl sm:rounded-2xl p-6 slide-up">
+            <div class="bg-white w-full sm:w-[450px] rounded-t-2xl sm:rounded-2xl p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold text-gray-800">Pembayaran</h3>
-                    <button @click="modals.checkout = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+                    <button @click="modals.checkout = false" class="text-gray-400"><i class="fas fa-times"></i></button>
                 </div>
-                
-                <div class="text-center mb-8">
-                    <p class="text-gray-500 text-sm mb-1">Total Tagihan</p>
+                <div class="text-center mb-8 bg-indigo-50 py-6 rounded-2xl">
+                    <p class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Tagihan</p>
                     <h2 class="text-4xl font-bold text-indigo-600">{{ formatRupiah(cartSubtotal) }}</h2>
                 </div>
-
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Uang Diterima</label>
-                        <input type="number" v-model="cashReceived" id="cashInput"
-                            class="w-full px-4 py-3 text-xl font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500" 
-                            placeholder="0">
+                        <label class="block text-sm font-medium mb-1">Uang Diterima</label>
+                        <input type="number" v-model="cashReceived" id="cashInput" class="w-full px-4 py-3 text-xl font-bold border rounded-xl focus:ring-2 focus:ring-indigo-500" placeholder="0">
                     </div>
-                    
                     <div class="grid grid-cols-3 gap-2">
-                        <button @click="cashReceived = cartSubtotal" class="py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200">Pas</button>
-                        <button @click="cashReceived = 50000" class="py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200">50.000</button>
-                        <button @click="cashReceived = 100000" class="py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200">100.000</button>
+                        <button @click="cashReceived = cartSubtotal" class="py-2 bg-gray-100 rounded-lg text-xs font-bold">Uang Pas</button>
+                        <button v-for="amt in [50000, 100000]" @click="cashReceived = amt" class="py-2 bg-gray-100 rounded-lg text-xs font-bold">{{ formatRupiah(amt) }}</button>
                     </div>
-
-                    <div v-if="cashReceived > 0" class="bg-indigo-50 p-4 rounded-xl flex justify-between items-center">
-                        <span class="text-indigo-900 font-medium">Kembalian</span>
+                    <div v-if="cashReceived > 0" class="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                        <span class="text-xs font-bold text-gray-500">KEMBALIAN</span>
                         <span class="text-xl font-bold text-indigo-600">{{ formatRupiah(Math.max(0, cashReceived - cartSubtotal)) }}</span>
                     </div>
-
-                    <button @click="processTransaction" :disabled="cashReceived < cartSubtotal"
-                        class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:shadow-none mt-4">
-                        Bayar Sekarang
-                    </button>
+                    <button @click="processTransaction" :disabled="cashReceived < cartSubtotal" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50">Bayar & Cetak</button>
                 </div>
             </div>
         </div>
 
-        <!-- 2. Product Modal -->
+        <!-- MODAL PRODUK -->
         <div v-if="modals.product" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div class="bg-white w-full max-w-md rounded-2xl p-6">
-                <h3 class="text-xl font-bold mb-4">{{ isEditing ? 'Edit Produk' : 'Tambah Produk' }}</h3>
+            <div class="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                <h3 class="text-xl font-bold mb-4 border-b pb-2">{{ isEditing ? 'Edit Produk' : 'Tambah Produk Baru' }}</h3>
                 <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                    <div>
-                        <label class="text-sm font-medium block mb-1">Barcode</label>
-                        <div class="flex gap-2">
-                            <input v-model="productForm.barcode" class="flex-1 px-3 py-2 border rounded-lg">
-                            <button @click="openScanner" class="px-3 py-2 bg-gray-100 rounded-lg"><i class="fas fa-barcode"></i></button>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium block mb-1">Nama Produk</label>
-                        <input v-model="productForm.name" class="w-full px-3 py-2 border rounded-lg" required>
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium block mb-1">Kategori</label>
-                        <select v-model="productForm.category" class="w-full px-3 py-2 border rounded-lg">
-                            <option v-for="cat in categories" :value="cat.name">{{ cat.name }}</option>
-                        </select>
-                    </div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">BARCODE / SKU</label><div class="flex gap-2"><input v-model="productForm.barcode" class="flex-1 px-3 py-2 border rounded-lg focus:ring-indigo-500"><button @click="openScanner" class="px-3 bg-gray-100 rounded-lg"><i class="fas fa-barcode"></i></button></div></div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">NAMA PRODUK</label><input v-model="productForm.name" class="w-full px-3 py-2 border rounded-lg focus:ring-indigo-500"></div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">KATEGORI</label><select v-model="productForm.category" class="w-full px-3 py-2 border rounded-lg"><option v-for="cat in categories" :value="cat.name">{{ cat.name }}</option></select></div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="text-sm font-medium block mb-1">Harga Beli</label>
-                            <input type="number" v-model="productForm.purchasePrice" class="w-full px-3 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="text-sm font-medium block mb-1">Harga Jual</label>
-                            <input type="number" v-model="productForm.sellingPrice" class="w-full px-3 py-2 border rounded-lg">
-                        </div>
+                        <div><label class="text-xs font-bold text-gray-400 block mb-1">HARGA BELI</label><input type="number" v-model="productForm.purchasePrice" class="w-full px-3 py-2 border rounded-lg"></div>
+                        <div><label class="text-xs font-bold text-gray-400 block mb-1">HARGA JUAL</label><input type="number" v-model="productForm.sellingPrice" class="w-full px-3 py-2 border rounded-lg"></div>
                     </div>
-                    <div>
-                        <label class="text-sm font-medium block mb-1">Stok Awal</label>
-                        <input type="number" v-model="productForm.stock" class="w-full px-3 py-2 border rounded-lg">
-                    </div>
+                    <div><label class="text-xs font-bold text-gray-400 block mb-1">STOK SAAT INI</label><input type="number" v-model="productForm.stock" class="w-full px-3 py-2 border rounded-lg"></div>
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button @click="modals.product = false" class="flex-1 py-2 border rounded-xl text-gray-600">Batal</button>
-                    <button @click="saveProduct" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl font-bold">Simpan</button>
+                    <button @click="modals.product = false" class="flex-1 py-3 border rounded-xl font-bold text-gray-500">Batal</button>
+                    <button @click="saveProduct" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold">Simpan Data</button>
                 </div>
             </div>
         </div>
 
-        <!-- 3. Scanner Modal -->
+        <!-- SCANNER MODAL -->
         <div v-if="modals.scanner" class="fixed inset-0 z-50 flex items-center justify-center bg-black">
             <div class="w-full max-w-lg relative">
-                <div id="reader" class="w-full bg-black"></div>
-                <button @click="closeScanner" class="absolute top-4 right-4 bg-white/20 text-white p-2 rounded-full">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
+                <div id="reader" class="w-full"></div>
+                <button @click="closeScanner" class="absolute top-4 right-4 bg-white/20 text-white p-2 rounded-full"><i class="fas fa-times text-xl"></i></button>
             </div>
         </div>
 
@@ -602,69 +490,83 @@
 
         createApp({
             setup() {
-                // --- STATE ---
-                // Setup URL Database (PENTING)
-                const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxR9EESzj6BonqTwyEqni9IJHhGX3vq4WZPctgk7gFJtvOrUuybIrWaNbpDFMqZAWx69A/exec';
-                
-                const storedUrl = localStorage.getItem('f2pos_api_url');
-                const WEB_APP_URL = ref(storedUrl || DEFAULT_URL); 
-                
-                const inputUrl = ref(WEB_APP_URL.value); // State untuk input form di settings
-                const canShare = ref(!!navigator.share);
-
-                watch(WEB_APP_URL, (newVal) => {
-                    inputUrl.value = newVal;
-                });
-                
+                const WEB_APP_URL = ref(localStorage.getItem('f2pos_api_url') || 'https://script.google.com/macros/s/AKfycbxR9EESzj6BonqTwyEqni9IJHhGX3vq4WZPctgk7gFJtvOrUuybIrWaNbpDFMqZAWx69A/exec');
+                const inputUrl = ref(WEB_APP_URL.value);
                 const isLoading = ref(false);
                 const loadingMessage = ref('Memuat...');
                 const loadingSubMessage = ref('');
                 const isOffline = ref(!navigator.onLine);
-
                 const isLoggedIn = ref(false);
                 const loginPin = ref('');
                 const sidebarCollapsed = ref(false);
                 const mobileMenuOpen = ref(false);
                 const showMobileCart = ref(false);
                 const activeTab = ref('dashboard');
+                const trxPeriod = ref('Semua');
                 
                 const products = ref([]);
                 const categories = ref([]);
                 const transactions = ref([]);
-                const settings = reactive({
-                    storeName: 'F2 CELL',
-                    storeAddress: 'Jl. Contoh No. 123',
-                    receiptFooter: 'Terima Kasih atas Kunjungan Anda',
-                    pin: '123456',
-                    logo: localStorage.getItem('f2pos_logo') || '' // Ambil logo dari localStorage
-                });
+                const settings = reactive({ storeName: 'F2 CELL', storeAddress: 'Jl. Contoh No. 123', receiptFooter: 'Terima Kasih', pin: '123456', logo: localStorage.getItem('f2pos_logo') || '' });
 
-                // Cart & POS
                 const cart = ref([]);
                 const searchQuery = ref('');
                 const activeCategory = ref('all');
                 const cashReceived = ref('');
-                
-                // Modals & Forms
-                const modals = reactive({
-                    checkout: false,
-                    product: false,
-                    scanner: false
-                });
+                const modals = reactive({ checkout: false, product: false, scanner: false });
                 const isEditing = ref(false);
                 const productForm = reactive({ id: null, barcode: '', name: '', category: 'Umum', purchasePrice: 0, sellingPrice: 0, stock: 0 });
-                
-                // Scanner
                 let html5QrcodeScanner = null;
 
-                // --- COMPUTED ---
-                const webAppUrlDisplay = computed(() => WEB_APP_URL.value ? WEB_APP_URL.value.substring(0, 30) + '...' : 'Belum diset');
+                // --- COMPUTED STATS ---
+                const statSummary = computed(() => {
+                    const now = new Date();
+                    
+                    // Helper function: check if date is within last X days or same month/year
+                    const getPeriodTrx = (type) => {
+                        return transactions.value.filter(t => {
+                            const d = new Date(t.date);
+                            if (type === 'week') {
+                                const diff = (now - d) / (1000 * 60 * 60 * 24);
+                                return diff <= 7;
+                            }
+                            if (type === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                            if (type === 'year') return d.getFullYear() === now.getFullYear();
+                            return false;
+                        });
+                    };
 
+                    const weekly = getPeriodTrx('week');
+                    const monthly = getPeriodTrx('month');
+                    const yearly = getPeriodTrx('year');
+
+                    return {
+                        weekly: weekly.reduce((s, t) => s + Number(t.total), 0),
+                        weeklyCount: weekly.length,
+                        monthly: monthly.reduce((s, t) => s + Number(t.total), 0),
+                        monthlyCount: monthly.length,
+                        yearly: yearly.reduce((s, t) => s + Number(t.total), 0),
+                        yearlyCount: yearly.length
+                    };
+                });
+
+                const dashboardStats = computed(() => {
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const todayTrx = transactions.value.filter(t => t.date === todayStr);
+                    const todayTotal = todayTrx.reduce((s, t) => s + Number(t.total), 0);
+
+                    return [
+                        { label: 'Omset Hari Ini', value: formatRupiah(todayTotal), icon: 'fas fa-wallet', colorBg: 'bg-indigo-100', colorText: 'text-indigo-600', period: 'Hari Ini' },
+                        { label: 'Total Transaksi', value: todayTrx.length, icon: 'fas fa-shopping-bag', colorBg: 'bg-blue-100', colorText: 'text-blue-600', period: 'Hari Ini' },
+                        { label: 'Omset Bulan Ini', value: formatRupiah(statSummary.value.monthly), icon: 'fas fa-chart-line', colorBg: 'bg-emerald-100', colorText: 'text-emerald-600', period: 'Bulan Ini' },
+                        { label: 'Produk Low Stok', value: products.value.filter(p => p.stock <= 5).length, icon: 'fas fa-exclamation-triangle', colorBg: 'bg-red-100', colorText: 'text-red-600', period: 'Alert' }
+                    ];
+                });
+
+                // --- FILTERS ---
                 const filteredProducts = computed(() => {
                     let res = products.value;
-                    if (activeCategory.value !== 'all') {
-                        res = res.filter(p => p.category === activeCategory.value);
-                    }
+                    if (activeCategory.value !== 'all') res = res.filter(p => p.category === activeCategory.value);
                     if (searchQuery.value) {
                         const q = searchQuery.value.toLowerCase();
                         res = res.filter(p => p.name.toLowerCase().includes(q) || p.barcode.includes(q));
@@ -672,577 +574,222 @@
                     return res;
                 });
 
-                const cartSubtotal = computed(() => {
-                    return cart.value.reduce((sum, item) => sum + (item.sellingPrice * item.qty), 0);
+                const filteredTransactions = computed(() => {
+                    let res = [...transactions.value].reverse();
+                    const now = new Date();
+                    if (trxPeriod.value === 'Minggu Ini') {
+                        res = res.filter(t => (now - new Date(t.date)) / (1000 * 24 * 3600) <= 7);
+                    } else if (trxPeriod.value === 'Bulan Ini') {
+                        res = res.filter(t => new Date(t.date).getMonth() === now.getMonth());
+                    } else if (trxPeriod.value === 'Tahun Ini') {
+                        res = res.filter(t => new Date(t.date).getFullYear() === now.getFullYear());
+                    }
+                    return res;
                 });
 
-                const cartTotalQty = computed(() => cart.value.reduce((sum, item) => sum + item.qty, 0));
+                const cartSubtotal = computed(() => cart.value.reduce((s, i) => s + (i.sellingPrice * i.qty), 0));
+                const cartTotalQty = computed(() => cart.value.reduce((s, i) => s + i.qty, 0));
 
-                const dashboardStats = computed(() => {
-                    const today = new Date().toISOString().slice(0, 10);
-                    const todayTrx = transactions.value.filter(t => t.date === today);
-                    const omset = todayTrx.reduce((sum, t) => sum + t.total, 0);
-                    const itemsSold = todayTrx.reduce((sum, t) => sum + (Array.isArray(t.items) ? t.items.reduce((s, i)=>s+i.qty,0) : 0), 0);
-
-                    return [
-                        { label: 'Omset', value: formatRupiah(omset), icon: 'fas fa-wallet', colorBg: 'bg-green-100', colorText: 'text-green-600' },
-                        { label: 'Transaksi', value: todayTrx.length, icon: 'fas fa-receipt', colorBg: 'bg-blue-100', colorText: 'text-blue-600' },
-                        { label: 'Item Terjual', value: itemsSold, icon: 'fas fa-box', colorBg: 'bg-orange-100', colorText: 'text-orange-600' },
-                        { label: 'Produk Low', value: products.value.filter(p=>p.stock<=5).length, icon: 'fas fa-exclamation-triangle', colorBg: 'bg-red-100', colorText: 'text-red-600' }
-                    ];
-                });
-
-                const menuItems = [
-                    { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
-                    { id: 'pos', label: 'Kasir', icon: 'fas fa-cash-register' },
-                    { id: 'products', label: 'Produk', icon: 'fas fa-box' },
-                    { id: 'transactions', label: 'Riwayat', icon: 'fas fa-history' },
-                    { id: 'settings', label: 'Pengaturan', icon: 'fas fa-cog' }
-                ];
-
-                const pageTitle = computed(() => {
-                    const found = menuItems.find(i => i.id === activeTab.value);
-                    return found ? found.label : 'F2POS';
-                });
-
-                // --- METHODS (API) ---
-
+                // --- API & DATA ---
                 async function callApi(action, payload = {}, id = null) {
-                    if (!WEB_APP_URL.value) {
-                        Swal.fire('Error', 'URL Database belum disetting. Silakan login ulang.', 'error');
-                        return null;
-                    }
-
-                    // Jangan set isLoading di sini jika dipanggil dari loop import (akan ditangani terpisah)
-                    if(action !== 'saveProductBulk') {
-                         isLoading.value = true;
-                         loadingMessage.value = action === 'getAll' ? 'Menyinkronkan Data...' : 'Menyimpan Data...';
-                    }
-
+                    isLoading.value = true;
                     try {
-                        let response;
-                        if (action === 'getAll') {
-                             response = await fetch(`${WEB_APP_URL.value}?action=getAll`);
-                        } else {
-                             // Force JSON.stringify to ensure correct format for GAS
-                             response = await fetch(WEB_APP_URL.value, {
-                                method: 'POST',
-                                body: JSON.stringify({ action, payload, id, updatedProducts: payload.updatedProducts })
-                            });
-                        }
-                       
-                        const data = await response.json();
-                        
-                        if(action !== 'saveProductBulk') isLoading.value = false;
-                        
-                        if (data && (data.products || data.success)) {
-                            return data;
-                        } else {
-                            throw new Error(data.message || 'Unknown error');
-                        }
-                    } catch (error) {
-                        console.error(error);
+                        let resp;
+                        if (action === 'getAll') resp = await fetch(`${WEB_APP_URL.value}?action=getAll`);
+                        else resp = await fetch(WEB_APP_URL.value, { method: 'POST', body: JSON.stringify({ action, payload, id, updatedProducts: payload.updatedProducts }) });
+                        const data = await resp.json();
                         isLoading.value = false;
-                        if(action !== 'saveProductBulk') Swal.fire('Koneksi Error', 'Gagal terhubung ke Google Sheet. Cek internet anda.', 'error');
+                        return data;
+                    } catch (e) {
+                        console.error(e); isLoading.value = false;
+                        Swal.fire('Koneksi Gagal', 'Gagal terhubung ke Google Sheet.', 'error');
                         return null;
                     }
                 }
 
                 async function loadData() {
-                    if(!WEB_APP_URL.value) return; 
-                    
                     const data = await callApi('getAll');
                     if (data) {
                         products.value = data.products || [];
                         transactions.value = data.transactions || [];
                         categories.value = data.categories.length ? data.categories : [{id:1, name:'Umum'}, {id:2, name:'Pulsa'}, {id:3, name:'Aksesoris'}];
-                        
-                        // Merge settings, but keep local logo
-                        const logoTemp = settings.logo;
-                        if (data.settings && Object.keys(data.settings).length > 0) {
+                        if (data.settings) {
+                            const logoTemp = settings.logo;
                             Object.assign(settings, data.settings);
+                            settings.logo = logoTemp;
                         }
-                        settings.logo = logoTemp; // Restore local logo
-                        
                         initChart();
                     }
                 }
 
-                // --- METHODS (IMPORT / EXPORT / TEMPLATE) ---
-                
-                function downloadTemplate() {
-                    const ws = XLSX.utils.json_to_sheet([
-                        { barcode: "89912345", name: "Contoh Produk", category: "Umum", purchasePrice: 5000, sellingPrice: 7000, stock: 100 }
-                    ]);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Template");
-                    XLSX.writeFile(wb, "Template_Produk_F2POS.xlsx");
-                }
-                
-                function exportProducts() {
-                    const dataToExport = products.value.map(p => ({
-                        Barcode: p.barcode,
-                        Nama: p.name,
-                        Kategori: p.category,
-                        'Harga Beli': p.purchasePrice,
-                        'Harga Jual': p.sellingPrice,
-                        Stok: p.stock
-                    }));
-                    const ws = XLSX.utils.json_to_sheet(dataToExport);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Produk");
-                    XLSX.writeFile(wb, "Data_Produk.xlsx");
-                }
-                
-                function exportTransactions() {
-                    const ws = XLSX.utils.json_to_sheet(transactions.value.map(t => ({
-                        Invoice: t.invoice, Tanggal: t.date, Jam: t.time, Total: t.total, Laba: t.total * 0.2
-                    })));
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, "Transaksi");
-                    XLSX.writeFile(wb, "Laporan_Penjualan.xlsx");
+                // --- POS ACTIONS ---
+                function addToCart(p) {
+                    if (p.stock <= 0) return Swal.fire('Habis', 'Stok produk ini kosong.', 'warning');
+                    const exists = cart.value.find(i => i.id === p.id);
+                    if (exists) {
+                        if (exists.qty < p.stock) exists.qty++;
+                        else Swal.fire('Limit', 'Mencapai batas stok.', 'warning');
+                    } else { cart.value.push({ ...p, qty: 1 }); }
                 }
 
-                async function importProducts(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-
-                    const reader = new FileReader();
-                    reader.onload = async (e) => {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-                        if (jsonData.length === 0) {
-                            Swal.fire('Error', 'File kosong atau format salah', 'error');
-                            return;
-                        }
-
-                        // Konfirmasi Import
-                        const result = await Swal.fire({
-                            title: `Import ${jsonData.length} Produk?`,
-                            text: "Produk akan diupload ke Google Sheet satu per satu. Jangan tutup browser.",
-                            icon: 'question',
-                            showCancelButton: true,
-                            confirmButtonText: 'Ya, Import'
-                        });
-
-                        if (result.isConfirmed) {
-                            isLoading.value = true;
-                            loadingMessage.value = 'Mengimport Produk...';
-                            
-                            let successCount = 0;
-                            // Loop and Upload (Batching would be better on backend, but loop works for existing script)
-                            for (let i = 0; i < jsonData.length; i++) {
-                                const row = jsonData[i];
-                                loadingSubMessage.value = `${i + 1} dari ${jsonData.length}`;
-                                
-                                const product = {
-                                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                                    barcode: row.barcode || row.Barcode || '',
-                                    name: row.name || row.Nama || 'Tanpa Nama',
-                                    category: row.category || row.Kategori || 'Umum',
-                                    purchasePrice: row.purchasePrice || row['Harga Beli'] || 0,
-                                    sellingPrice: row.sellingPrice || row['Harga Jual'] || 0,
-                                    stock: row.stock || row.Stok || 0
-                                };
-                                
-                                // Optimistic update local
-                                products.value.push(product);
-                                
-                                // Call API "silently"
-                                await callApi('saveProduct', product);
-                                successCount++;
-                            }
-                            
-                            isLoading.value = false;
-                            loadingSubMessage.value = '';
-                            Swal.fire('Selesai', `${successCount} Produk berhasil diimport`, 'success');
-                            event.target.value = ''; // Reset input
-                        }
-                    };
-                    reader.readAsArrayBuffer(file);
+                function updateQty(item, d) {
+                    const p = products.value.find(x => x.id === item.id);
+                    if (item.qty + d > p.stock) return Swal.fire('Stok Kurang', '', 'warning');
+                    if (item.qty + d > 0) item.qty += d;
+                    else removeFromCart(cart.value.indexOf(item));
                 }
 
-                // --- METHODS (LOGO & SETTINGS) ---
-
-                function handleLogoUpload(event) {
-                    const file = event.target.files[0];
-                    if(file) {
-                        if(file.size > 500000) { // 500KB limit
-                             Swal.fire('File Terlalu Besar', 'Maksimal ukuran logo 500KB agar aplikasi tidak berat.', 'warning');
-                             return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            settings.logo = e.target.result;
-                            // Simpan ke localStorage segera
-                            localStorage.setItem('f2pos_logo', e.target.result);
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                }
-
-                // --- METHODS (AUTH) ---
-                function handleLogin() {
-                    if (!WEB_APP_URL.value) {
-                         promptWebAppUrl();
-                    } else if (loginPin.value === settings.pin) {
-                        isLoggedIn.value = true;
-                        loadData();
-                    } else {
-                        Swal.fire('Error', 'PIN Salah!', 'error');
-                    }
-                }
-
-                function promptWebAppUrl() {
-                    Swal.fire({
-                        title: 'Setup Database',
-                        text: 'Masukkan URL Google Web App (Apps Script) Anda:',
-                        input: 'text',
-                        inputPlaceholder: 'https://script.google.com/macros/s/.../exec',
-                        showCancelButton: false,
-                        confirmButtonText: 'Simpan',
-                        allowOutsideClick: false
-                    }).then((result) => {
-                        if (result.isConfirmed && result.value) {
-                            WEB_APP_URL.value = result.value;
-                            localStorage.setItem('f2pos_api_url', result.value);
-                            handleLogin(); 
-                        }
-                    });
-                }
-
-                function resetWebAppUrl() {
-                    localStorage.removeItem('f2pos_api_url');
-                    WEB_APP_URL.value = '';
-                    isLoggedIn.value = false;
-                    promptWebAppUrl();
-                }
-
-                function handleLogout() {
-                    isLoggedIn.value = false;
-                    loginPin.value = '';
-                    sidebarCollapsed.value = false;
-                }
-
-                // --- METHODS (POS) ---
-                function addToCart(product) {
-                    if (product.stock <= 0) {
-                        Swal.fire({ icon: 'error', title: 'Stok Habis', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-                        return;
-                    }
-                    
-                    const existing = cart.value.find(item => item.id === product.id);
-                    if (existing) {
-                        if (existing.qty < product.stock) {
-                            existing.qty++;
-                        } else {
-                             Swal.fire({ icon: 'warning', title: 'Stok Maksimum', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-                        }
-                    } else {
-                        cart.value.push({ ...product, qty: 1 });
-                    }
-                    if(window.innerWidth < 768) showMobileCart.value = true;
-                }
-
-                function updateQty(item, delta) {
-                    const product = products.value.find(p => p.id === item.id);
-                    const newQty = item.qty + delta;
-                    
-                    if (newQty > product.stock) {
-                        Swal.fire({ icon: 'warning', title: 'Stok tidak cukup', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-                        return;
-                    }
-
-                    if (newQty > 0) {
-                        item.qty = newQty;
-                    } else {
-                        removeFromCart(cart.value.indexOf(item));
-                    }
-                }
-
-                function removeFromCart(index) {
-                    cart.value.splice(index, 1);
-                }
-
-                function clearCart() {
-                    cart.value = [];
-                }
-
-                function openCheckout() {
-                    cashReceived.value = '';
-                    modals.checkout = true;
-                    nextTick(() => document.getElementById('cashInput')?.focus());
-                }
+                function removeFromCart(i) { cart.value.splice(i, 1); }
+                function clearCart() { cart.value = []; }
+                function openCheckout() { cashReceived.value = ''; modals.checkout = true; nextTick(() => document.getElementById('cashInput')?.focus()); }
 
                 async function processTransaction() {
                     if (cashReceived.value < cartSubtotal.value) return;
-
-                    const trxData = {
-                        invoice: 'INV-' + Date.now(),
+                    const trx = {
+                        invoice: 'F2-' + Date.now(),
                         date: new Date().toISOString().slice(0, 10),
                         time: new Date().toLocaleTimeString('id-ID'),
-                        items: JSON.stringify(cart.value.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.sellingPrice }))),
+                        items: JSON.stringify(cart.value.map(i => ({ name: i.name, qty: i.qty, price: i.sellingPrice }))),
                         total: cartSubtotal.value,
                         payAmount: cashReceived.value,
-                        change: cashReceived.value - cartSubtotal.value,
-                        paymentMethod: 'CASH'
+                        change: cashReceived.value - cartSubtotal.value
                     };
-
-                    const updatedProducts = [];
-                    cart.value.forEach(cartItem => {
-                        const product = products.value.find(p => p.id === cartItem.id);
-                        if (product) {
-                            product.stock -= cartItem.qty;
-                            updatedProducts.push(product);
-                        }
+                    const updated = [];
+                    cart.value.forEach(i => {
+                        const p = products.value.find(x => x.id === i.id);
+                        if(p) { p.stock -= i.qty; updated.push(p); }
                     });
-                    
-                    transactions.value.push(trxData);
-                    
-                    const res = await callApi('saveTransaction', { ...trxData, items: trxData.items, updatedProducts }); 
-                    
-                    if (res && res.success) {
-                        modals.checkout = false;
-                        printReceipt(trxData);
-                        clearCart();
-                        Swal.fire({ icon: 'success', title: 'Transaksi Sukses!', timer: 1500, showConfirmButton: false });
-                    }
+                    transactions.value.push(trx);
+                    const res = await callApi('saveTransaction', { ...trx, updatedProducts: updated });
+                    if (res?.success) { modals.checkout = false; printReceipt(trx); clearCart(); Swal.fire({ icon: 'success', title: 'Transaksi Berhasil', timer: 1000, showConfirmButton: false }); }
                 }
 
-                // --- METHODS (PRODUCTS) ---
-                function openProductModal(product = null) {
-                    isEditing.value = !!product;
-                    if (product) {
-                        Object.assign(productForm, product);
-                    } else {
-                        Object.assign(productForm, { id: Date.now().toString(), barcode: '', name: '', category: 'Umum', purchasePrice: 0, sellingPrice: 0, stock: 0 });
-                    }
+                // --- PRODUCT ACTIONS ---
+                function openProductModal(p = null) {
+                    isEditing.value = !!p;
+                    if (p) Object.assign(productForm, p);
+                    else Object.assign(productForm, { id: Date.now().toString(), barcode: '', name: '', category: 'Umum', purchasePrice: 0, sellingPrice: 0, stock: 0 });
                     modals.product = true;
                 }
-
                 async function saveProduct() {
-                    if (!productForm.name || !productForm.sellingPrice) return;
-                    
-                    const payload = { ...productForm };
-                    
-                    if (isEditing.value) {
-                        const idx = products.value.findIndex(p => p.id === payload.id);
-                        if (idx !== -1) products.value[idx] = payload;
-                    } else {
-                        products.value.push(payload);
-                    }
-                    
-                    const res = await callApi('saveProduct', payload);
-                    if (res && res.success) {
-                        modals.product = false;
-                        Swal.fire({ icon: 'success', title: 'Produk Disimpan', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-                    }
+                    const res = await callApi('saveProduct', productForm);
+                    if (res?.success) { modals.product = false; loadData(); }
                 }
-
                 async function deleteProduct(id) {
-                    const result = await Swal.fire({ title: 'Hapus?', text: 'Data tidak bisa dikembalikan', icon: 'warning', showCancelButton: true });
-                    if (result.isConfirmed) {
-                        products.value = products.value.filter(p => p.id !== id); 
-                        await callApi('deleteProduct', {}, id); 
-                    }
+                    const confirm = await Swal.fire({ title: 'Hapus?', icon: 'warning', showCancelButton: true });
+                    if (confirm.isConfirmed) { await callApi('deleteProduct', {}, id); loadData(); }
                 }
 
-                // --- METHODS (SETTINGS) ---
-                async function saveSettings() {
-                    if (inputUrl.value && inputUrl.value !== WEB_APP_URL.value) {
-                        WEB_APP_URL.value = inputUrl.value;
-                        localStorage.setItem('f2pos_api_url', inputUrl.value);
-                    }
-                    
-                    // Simpan logo ke localStorage saja (sudah di handleLogoUpload), jangan kirim base64 ke sheet biar ringan
-                    // Kirim setting text ke sheet
-                    const settingsToSend = { ...settings };
-                    delete settingsToSend.logo; // Hapus logo dari payload ke sheet
+                // --- UI UTILS ---
+                function handleLogin() { 
+                    if (loginPin.value === settings.pin) { isLoggedIn.value = true; loadData(); } 
+                    else Swal.fire('PIN Salah', '', 'error');
+                }
+                function handleLogout() { isLoggedIn.value = false; loginPin.value = ''; }
+                function formatRupiah(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n); }
+                function resetWebAppUrl() { localStorage.removeItem('f2pos_api_url'); location.reload(); }
+                function copyDbUrl() { navigator.clipboard.writeText(WEB_APP_URL.value); Swal.fire({ icon: 'success', title: 'URL Disalin', timer: 1000, showConfirmButton: false }); }
+                function saveSettings() { localStorage.setItem('f2pos_api_url', inputUrl.value); WEB_APP_URL.value = inputUrl.value; callApi('saveSettings', settings).then(res => { if(res?.success) Swal.fire('Disimpan', '', 'success'); }); }
 
-                    const res = await callApi('saveSettings', settingsToSend);
-                    if(res && res.success) {
-                        Swal.fire('Sukses', 'Pengaturan & URL disimpan', 'success');
-                    }
-                }
-                
-                function copyDbUrl() {
-                    if (!inputUrl.value) return;
-                    navigator.clipboard.writeText(inputUrl.value).then(() => {
-                        Swal.fire({ icon: 'success', title: 'URL Disalin', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-                    });
-                }
-                
-                function shareDbUrl() {
-                    if (!inputUrl.value) return;
-                    if (navigator.share) {
-                        navigator.share({ title: 'F2POS Database URL', text: 'Gunakan URL ini untuk menghubungkan aplikasi kasir:', url: inputUrl.value });
-                    }
+                function handleLogoUpload(e) {
+                    const file = e.target.files[0];
+                    if(file && file.size < 500000) {
+                        const r = new FileReader();
+                        r.onload = (ev) => { settings.logo = ev.target.result; localStorage.setItem('f2pos_logo', ev.target.result); };
+                        r.readAsDataURL(file);
+                    } else { Swal.fire('Gagal', 'File terlalu besar (Maks 500KB)', 'warning'); }
                 }
 
-                // --- UTILS ---
-                function formatRupiah(number) {
-                    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-                }
-
-                const currentDate = ref(new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-                const currentTime = ref(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
-                setInterval(() => {
-                    currentTime.value = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-                }, 1000);
-
-                // --- SCANNER ---
                 function openScanner() {
                     modals.scanner = true;
                     nextTick(() => {
                         html5QrcodeScanner = new Html5Qrcode("reader");
-                        html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },
-                            (decodedText) => {
-                                if (modals.product) {
-                                    productForm.barcode = decodedText;
-                                    closeScanner();
-                                } else {
-                                    searchQuery.value = decodedText;
-                                    closeScanner();
-                                    const prod = products.value.find(p => p.barcode === decodedText);
-                                    if(prod) {
-                                        addToCart(prod);
-                                        searchQuery.value = '';
-                                        Swal.fire({ icon: 'success', title: 'Produk ditemukan', toast: true, position: 'top-end', showConfirmButton: false, timer: 1000 });
-                                    } else {
-                                        Swal.fire('Not Found', 'Produk tidak ditemukan', 'warning');
-                                    }
-                                }
-                            },
-                            (errorMessage) => { /* ignore */ }
-                        ).catch(err => console.log(err));
+                        html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+                            if (modals.product) { productForm.barcode = text; closeScanner(); }
+                            else { 
+                                searchQuery.value = text; closeScanner(); 
+                                const p = products.value.find(x => x.barcode === text);
+                                if(p) { addToCart(p); searchQuery.value = ''; }
+                            }
+                        });
                     });
                 }
+                function closeScanner() { if(html5QrcodeScanner) html5QrcodeScanner.stop().then(() => { html5QrcodeScanner.clear(); modals.scanner = false; }); }
 
-                function closeScanner() {
-                    if (html5QrcodeScanner) {
-                        html5QrcodeScanner.stop().then(() => { html5QrcodeScanner.clear(); modals.scanner = false; }).catch(err => console.log(err));
-                    } else { modals.scanner = false; }
-                }
-                
-                // --- PRINT (UPDATED: USE IFRAME TO AVOID POPUP BLOCKER) ---
                 function printReceipt(trx) {
                     const iframe = document.getElementById('receipt-frame');
+                    const items = (typeof trx.items === 'string') ? JSON.parse(trx.items) : trx.items;
+                    const logo = settings.logo ? `<img src="${settings.logo}" style="max-width:50%; margin-bottom:10px;">` : '';
+                    const content = `<html><head><style>body{font-family:'Courier New',monospace;font-size:12px;width:58mm;margin:0;padding:5px}table{width:100%}.text-center{text-align:center}.text-right{text-align:right}hr{border-top:1px dashed #000}</style></head>
+                        <body><div class="text-center">${logo}<br><b>${settings.storeName}</b><br>${settings.storeAddress}</div><hr>
+                        <div>No: ${trx.invoice}<br>Tgl: ${trx.date} ${trx.time}</div><hr>
+                        <table>${items.map(i => `<tr><td>${i.name} x${i.qty}</td><td class="text-right">${formatRupiah(i.price * i.qty)}</td></tr>`).join('')}</table><hr>
+                        <table><tr><td>Total</td><td class="text-right"><b>${formatRupiah(trx.total)}</b></td></tr><tr><td>Bayar</td><td class="text-right">${formatRupiah(trx.payAmount)}</td></tr><tr><td>Kembali</td><td class="text-right">${formatRupiah(trx.change)}</td></tr></table><hr>
+                        <div class="text-center">${settings.receiptFooter}</div></body></html>`;
                     const doc = iframe.contentWindow.document;
-                    
-                    const itemsHtml = (typeof trx.items === 'string' ? JSON.parse(trx.items) : trx.items).map(i => 
-                        `<tr>
-                            <td style="padding: 2px 0;">${i.name} <br> <span style="font-size:10px; color:#666;">${i.qty} x ${formatRupiah(i.price)}</span></td>
-                            <td style="text-align:right; vertical-align:top; padding: 2px 0;">${formatRupiah(i.price * i.qty)}</td>
-                        </tr>`
-                    ).join('');
-                    
-                    const logoHtml = settings.logo ? `<img src="${settings.logo}" style="max-width:60%; margin-bottom:10px; display:block; margin-left:auto; margin-right:auto;">` : '';
-
-                    const content = `
-                        <html>
-                        <head>
-                            <style>
-                                body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; width: 58mm; }
-                                table { width: 100%; border-collapse: collapse; }
-                                td { vertical-align: top; }
-                                hr { border-top: 1px dashed #000; border-bottom: none; margin: 10px 0; }
-                                .text-center { text-align: center; }
-                                .text-right { text-align: right; }
-                                .bold { font-weight: bold; }
-                                .small { font-size: 10px; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="text-center">
-                                ${logoHtml}
-                                <div class="bold" style="font-size:14px">${settings.storeName}</div>
-                                <div class="small">${settings.storeAddress}</div>
-                            </div>
-                            <hr>
-                            <div>No: ${trx.invoice}</div>
-                            <div>Tgl: ${trx.date} ${trx.time}</div>
-                            <hr>
-                            <table>${itemsHtml}</table>
-                            <hr>
-                            <table>
-                                <tr><td>Total</td><td class="text-right bold">${formatRupiah(trx.total)}</td></tr>
-                                <tr><td>Bayar</td><td class="text-right">${formatRupiah(trx.payAmount)}</td></tr>
-                                <tr><td>Kembali</td><td class="text-right">${formatRupiah(trx.change)}</td></tr>
-                            </table>
-                            <hr>
-                            <div class="text-center small">
-                                ${settings.receiptFooter}<br>
-                                <br>
-                                -- Simpan Struk Ini --
-                            </div>
-                        </body>
-                        </html>
-                    `;
-                    
-                    doc.open();
-                    doc.write(content);
-                    doc.close();
-                    
-                    // Tunggu sebentar agar style/gambar terload sebelum print
-                    setTimeout(() => {
-                        iframe.contentWindow.focus();
-                        iframe.contentWindow.print();
-                    }, 500);
+                    doc.open(); doc.write(content); doc.close();
+                    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); }, 500);
                 }
-                
-                // --- CHART ---
+
                 function initChart() {
                     const ctx = document.getElementById('salesChart');
                     if (!ctx) return;
-                    
-                    const last7Days = [...Array(7)].map((_, i) => {
-                        const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10);
-                    });
-                    const dataPoints = last7Days.map(date => {
-                        return transactions.value.filter(t => t.date === date).reduce((sum, t) => sum + t.total, 0);
-                    });
-
-                    const existingChart = Chart.getChart("salesChart");
-                    if (existingChart) existingChart.destroy();
-
+                    const dates = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
+                    const values = dates.map(d => transactions.value.filter(t => t.date === d).reduce((s, t) => s + Number(t.total), 0));
+                    if (Chart.getChart("salesChart")) Chart.getChart("salesChart").destroy();
                     new Chart(ctx, {
                         type: 'line',
-                        data: {
-                            labels: last7Days.map(d => d.slice(5)), 
-                            datasets: [{
-                                label: 'Omset', data: dataPoints, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.1)', fill: true, tension: 0.4
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 4] } }, x: { grid: { display: false } } }
-                        }
+                        data: { labels: dates.map(d => d.slice(5)), datasets: [{ label: 'Omset', data: values, borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.1)', fill: true, tension: 0.4 }] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
                     });
                 }
-                
-                watch(activeTab, (val) => { if (val === 'dashboard') nextTick(initChart); });
+
+                // --- EXCEL ---
+                function downloadTemplate() { 
+                    const ws = XLSX.utils.json_to_sheet([{ barcode: "123", name: "Contoh", category: "Umum", purchasePrice: 1000, sellingPrice: 2000, stock: 10 }]);
+                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Produk"); XLSX.writeFile(wb, "Template_Produk.xlsx");
+                }
+                function exportProducts() {
+                    const ws = XLSX.utils.json_to_sheet(products.value);
+                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Stok"); XLSX.writeFile(wb, "Data_Stok.xlsx");
+                }
+                function exportTransactions() {
+                    const ws = XLSX.utils.json_to_sheet(filteredTransactions.value);
+                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Laporan"); XLSX.writeFile(wb, "Laporan_Transaksi.xlsx");
+                }
+
+                onMounted(() => { 
+                    const savedPin = localStorage.getItem('f2pos_pin');
+                    if(savedPin) settings.pin = savedPin;
+                });
+
+                watch(activeTab, (v) => { if(v === 'dashboard') nextTick(initChart); });
 
                 return {
-                    isLoading, loadingMessage, loadingSubMessage, isOffline,
-                    isLoggedIn, loginPin, handleLogin, handleLogout, resetWebAppUrl,
-                    sidebarCollapsed, mobileMenuOpen, showMobileCart, activeTab,
-                    menuItems, pageTitle, currentDate, currentTime,
-                    products, transactions, categories, settings, cart,
-                    searchQuery, activeCategory, filteredProducts,
-                    cartSubtotal, cartTotalQty, dashboardStats,
-                    modals, isEditing, productForm, cashReceived,
-                    addToCart, updateQty, removeFromCart, clearCart,
-                    openCheckout, processTransaction,
-                    openProductModal, saveProduct, deleteProduct,
-                    saveSettings, openScanner, closeScanner,
-                    formatRupiah, handleKeyup: ()=>{}, printReceipt, 
-                    exportTransactions, exportProducts, downloadTemplate, importProducts, handleLogoUpload,
-                    loadData, webAppUrlDisplay, promptWebAppUrl, inputUrl, copyDbUrl, shareDbUrl, canShare
+                    isLoading, loadingMessage, loadingSubMessage, isOffline, isLoggedIn, loginPin, sidebarCollapsed, mobileMenuOpen, showMobileCart, activeTab, trxPeriod,
+                    products, transactions, categories, settings, cart, searchQuery, activeCategory, cashReceived, modals, isEditing, productForm,
+                    dashboardStats, filteredProducts, filteredTransactions, cartSubtotal, cartTotalQty, statSummary,
+                    handleLogin, handleLogout, formatRupiah, resetWebAppUrl, copyDbUrl, saveSettings, handleLogoUpload,
+                    addToCart, updateQty, removeFromCart, clearCart, openCheckout, processTransaction,
+                    openProductModal, saveProduct, deleteProduct, openScanner, closeScanner, loadData,
+                    printReceipt, downloadTemplate, exportProducts, exportTransactions,
+                    menuItems: [
+                        { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-home' },
+                        { id: 'pos', label: 'Kasir', icon: 'fas fa-cash-register' },
+                        { id: 'products', label: 'Produk', icon: 'fas fa-box' },
+                        { id: 'transactions', label: 'Riwayat', icon: 'fas fa-history' },
+                        { id: 'settings', label: 'Pengaturan', icon: 'fas fa-cog' }
+                    ],
+                    pageTitle: computed(() => {
+                        if(activeTab.value === 'dashboard') return 'Laporan Dashboard';
+                        if(activeTab.value === 'pos') return 'Mesin Kasir';
+                        if(activeTab.value === 'products') return 'Manajemen Stok';
+                        if(activeTab.value === 'transactions') return 'Riwayat Transaksi';
+                        return 'Pengaturan Aplikasi';
+                    }),
+                    currentDate: ref(new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
+                    currentTime: ref(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })),
+                    inputUrl
                 };
             }
         }).mount('#app');
